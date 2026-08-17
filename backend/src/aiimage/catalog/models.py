@@ -31,6 +31,8 @@ class Product(Base):
     sku: Mapped[str] = mapped_column(String(100), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(255))
     category: Mapped[str] = mapped_column(String(30))
+    brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -61,4 +63,3 @@ class TruthAnchor(Base):
         DateTime(timezone=True),
         server_default=func.now(),
     )
-

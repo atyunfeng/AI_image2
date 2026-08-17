@@ -17,7 +17,8 @@ from aiimage.bulk.models import BulkJob, BulkJobRow  # noqa: F401
 from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
 from aiimage.config import get_settings
 from aiimage.db import Base
-from aiimage.editing.models import EditEvidence, EditProject, EditRevision  # noqa: F401
+from aiimage.editing.models import EditEvidence, EditLayer, EditProject, EditRevision  # noqa: F401
+from aiimage.export.models import ExportRecord  # noqa: F401
 from aiimage.fashion.evidence_models import FashionEvidence  # noqa: F401
 from aiimage.fashion.models import FashionPlan  # noqa: F401
 from aiimage.models.models import ModelConfiguration  # noqa: F401
@@ -60,6 +61,7 @@ async def authenticated_app(session_factory):
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_store] = InMemoryObjectStore
     return app
 
 
@@ -81,6 +83,7 @@ async def operator_client(session_factory) -> AsyncIterator[AsyncClient]:
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_store] = InMemoryObjectStore
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,

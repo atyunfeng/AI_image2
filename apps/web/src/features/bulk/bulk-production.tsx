@@ -21,18 +21,18 @@ export function BulkProduction({ models, packs, initialJobs }: { models: ModelCo
     const body = await response.json().catch(() => ({ detail: "导入失败" }));
     if (response.ok) {
       setJobs((current) => [body, ...current]);
-      setMessage(body.dry_run ? "CSV 预检完成，未创建生产任务。" : "批量任务已创建，失败行不会影响成功行。");
+      setMessage(body.dry_run ? "文件预检完成，未创建生产任务。" : "批量任务已创建，失败行不会影响成功行。");
     } else setMessage(body.detail ?? "导入失败");
     setBusy(false);
   }
 
   return <div className="grid items-start gap-6 xl:grid-cols-[420px_1fr]">
-    <section className="panel h-fit p-6"><div className="flex items-start justify-between gap-3"><div><p className="eyebrow">CSV INTAKE</p><h2 className="section-title mt-2">批量生产入口</h2></div><a className="secondary-button text-xs" download="aiimage-bulk-template.csv" href={'data:text/csv;charset=utf-8,sku,name,category,platform_slug,mode,reference_asset_id,reference_view%0AEXAMPLE-001,%E5%95%86%E5%93%81%E5%90%8D,apparel,jd-cn,strict,,front'}>下载模板</a></div>
+    <section className="panel h-fit p-6"><div className="flex items-start justify-between gap-3"><div><p className="eyebrow">CSV / XLSX INTAKE</p><h2 className="section-title mt-2">批量生产入口</h2></div><a className="secondary-button text-xs" download="aiimage-bulk-template.csv" href={'data:text/csv;charset=utf-8,sku,name,brand,category,platform_slug,mode,reference_asset_id,reference_view%0AEXAMPLE-001,%E5%95%86%E5%93%81%E5%90%8D,,apparel,jd-cn,strict,,front'}>下载模板</a></div>
       <form className="form-grid mt-6" onSubmit={submit} aria-busy={busy}>
-        <div><label className="field-label mb-2" htmlFor="bulk-file">CSV 文件</label><input className="field file:mr-3 file:rounded-lg file:border-0 file:bg-orange-400 file:px-3 file:py-1 file:text-slate-950" id="bulk-file" name="file" type="file" accept=".csv,text/csv" required /></div>
+        <div><label className="field-label mb-2" htmlFor="bulk-file">CSV 或 XLSX 文件</label><input className="field file:mr-3 file:rounded-lg file:border-0 file:bg-orange-400 file:px-3 file:py-1 file:text-slate-950" id="bulk-file" name="file" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required /></div>
         <div><label className="field-label mb-2" htmlFor="bulk-model">生图模型</label><select className="field" id="bulk-model" name="model_configuration_id" required>{eligibleModels.map((model) => <option key={model.id} value={model.id}>{model.name} · {model.model_id}</option>)}</select></div>
         <div className="grid gap-3 sm:grid-cols-2"><div><label className="field-label mb-2" htmlFor="bulk-category">品类包</label><select className="field" id="bulk-category" name="category_pack_version_id" required>{categories.map((pack) => <option key={pack.version_id} value={pack.version_id}>{pack.name}</option>)}</select></div><div><label className="field-label mb-2" htmlFor="bulk-brand">品牌包</label><select className="field" id="bulk-brand" name="brand_pack_version_id" required>{brands.map((pack) => <option key={pack.version_id} value={pack.version_id}>{pack.name}</option>)}</select></div></div>
-        <label className="flex items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-slate-300"><input className="mt-1" type="checkbox" name="dry_run" value="true" /><span>仅预检 CSV<small className="mt-1 block text-slate-500">保存逐行校验结果，但不创建商品、套图和生图任务。</small></span></label>
+        <label className="flex items-start gap-3 rounded-xl border border-white/10 p-3 text-sm text-slate-300"><input className="mt-1" type="checkbox" name="dry_run" value="true" /><span>仅预检文件<small className="mt-1 block text-slate-500">保存逐行校验结果，但不创建商品、套图和生图任务。</small></span></label>
         <button className="primary-button" disabled={busy || !eligibleModels.length}>{busy ? "处理中…" : "上传并创建任务"}</button>
         <p className="text-xs leading-5 text-slate-500">已有 SKU 可复用原参考图；新 SKU 必须填写已上传的 reference_asset_id。单次最多 500 行、2 MiB。</p>
         <p role="status" aria-live="polite" className="min-h-5 text-sm text-orange-200">{message}</p>

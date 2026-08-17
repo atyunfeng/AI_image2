@@ -4,8 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from aiimage.analytics.schemas import CostReportResponse
-from aiimage.analytics.service import build_cost_report
+from aiimage.analytics.schemas import CostReportResponse, OperationsReportResponse
+from aiimage.analytics.service import build_cost_report, build_operations_report
 from aiimage.api.dependencies import get_session
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
@@ -34,3 +34,25 @@ async def cost_report(
         sku=sku,
     )
 
+
+@router.get("/operations", response_model=OperationsReportResponse)
+async def operations_report(
+    user: AnalyticsUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    date_from: Annotated[date | None, Query()] = None,
+    date_to: Annotated[date | None, Query()] = None,
+    provider: Annotated[str | None, Query(max_length=50)] = None,
+    platform_slug: Annotated[str | None, Query(max_length=100)] = None,
+    sku: Annotated[str | None, Query(max_length=100)] = None,
+    status: Annotated[str | None, Query(max_length=30)] = None,
+) -> OperationsReportResponse:
+    del user
+    return await build_operations_report(
+        session,
+        date_from=date_from,
+        date_to=date_to,
+        provider=provider,
+        platform_slug=platform_slug,
+        sku=sku,
+        status=status,
+    )

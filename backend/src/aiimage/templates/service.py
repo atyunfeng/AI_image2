@@ -1,8 +1,12 @@
+from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiimage.audit.service import record_audit_event
 from aiimage.catalog.models import Product, ProductReference
 from aiimage.templates.compiler import PlanCompilationError, compile_plan
 from aiimage.templates.models import (
@@ -15,10 +19,29 @@ from aiimage.templates.models import (
 from aiimage.templates.presets import first_party_packs
 from aiimage.templates.schemas import (
     CompilePlanRequest,
+    ManagedTemplatePackResponse,
+    ProductionPlanItemCreate,
     ProductionPlanItemResponse,
+    ProductionPlanItemUpdate,
     ProductionPlanResponse,
+    TemplatePackCreate,
     TemplatePackResponse,
+    TemplatePackVersionCreate,
+    TemplatePackVersionResponse,
 )
+from aiimage.workflow.models import GenerationBatch
+
+
+class DuplicatePackSlugError(RuntimeError):
+    pass
+
+
+class PackManagementError(RuntimeError):
+    pass
+
+
+class PlanMutationError(RuntimeError):
+    pass
 
 
 async def ensure_first_party_packs(session: AsyncSession) -> None:
@@ -35,6 +58,7 @@ async def ensure_first_party_packs(session: AsyncSession) -> None:
                 version=1,
                 rules=preset["rules"],
                 source="first_party_default",
+                published_at=datetime.now(UTC),
             )
         )
     await session.commit()
@@ -65,6 +89,141 @@ async def list_published_packs(session: AsyncSession) -> list[TemplatePackRespon
         )
         for pack, version in rows
     ]
+
+
+def _version_response(version: TemplatePackVersion) -> TemplatePackVersionResponse:
+    return TemplatePackVersionResponse(
+        id=version.id,
+        version=version.version,
+        status=version.status,
+        rules=version.rules,
+        source=version.source,
+        published_at=version.published_at,
+    )
+
+
+async def list_managed_packs(session: AsyncSession) -> list[ManagedTemplatePackResponse]:
+    await ensure_first_party_packs(session)
+    packs = list((await session.scalars(select(TemplatePack).order_by(TemplatePack.kind, TemplatePack.slug))).all())
+    versions = list(
+        (
+            await session.scalars(
+                select(TemplatePackVersion).order_by(
+                    TemplatePackVersion.pack_id, TemplatePackVersion.version.desc()
+                )
+            )
+        ).all()
+    )
+    by_pack: dict[UUID, list[TemplatePackVersionResponse]] = {}
+    for version in versions:
+        by_pack.setdefault(version.pack_id, []).append(_version_response(version))
+    return [
+        ManagedTemplatePackResponse(
+            id=pack.id,
+            slug=pack.slug,
+            name=pack.name,
+            kind=pack.kind,
+            versions=by_pack.get(pack.id, []),
+        )
+        for pack in packs
+    ]
+
+
+async def create_template_pack(
+    session: AsyncSession, *, payload: TemplatePackCreate, user_id: UUID
+) -> ManagedTemplatePackResponse:
+    pack = TemplatePack(slug=payload.slug, name=payload.name.strip(), kind=payload.kind.value)
+    session.add(pack)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise DuplicatePackSlugError(payload.slug) from exc
+    version = TemplatePackVersion(
+        pack_id=pack.id,
+        version=1,
+        status="draft",
+        rules=payload.rules,
+        source="user_authored",
+        published_at=None,
+    )
+    session.add(version)
+    await record_audit_event(
+        session,
+        event_type="template_pack.created",
+        actor_user_id=user_id,
+        details={"pack_id": str(pack.id), "slug": pack.slug, "version": 1},
+    )
+    await session.commit()
+    await session.refresh(version)
+    return ManagedTemplatePackResponse(
+        id=pack.id,
+        slug=pack.slug,
+        name=pack.name,
+        kind=pack.kind,
+        versions=[_version_response(version)],
+    )
+
+
+async def create_pack_version(
+    session: AsyncSession,
+    *,
+    pack_id: UUID,
+    payload: TemplatePackVersionCreate,
+    user_id: UUID,
+) -> TemplatePackVersionResponse:
+    pack = await session.get(TemplatePack, pack_id)
+    if pack is None:
+        raise LookupError(pack_id)
+    source_rules: dict[str, Any] = {}
+    if payload.source_version_id:
+        source = await session.get(TemplatePackVersion, payload.source_version_id)
+        if source is None or source.pack_id != pack_id:
+            raise PackManagementError("Source version does not belong to this pack")
+        source_rules = source.rules
+    if payload.rules is None and not payload.source_version_id:
+        raise PackManagementError("Rules or source_version_id is required")
+    latest = await session.scalar(
+        select(func.max(TemplatePackVersion.version)).where(TemplatePackVersion.pack_id == pack_id)
+    )
+    version = TemplatePackVersion(
+        pack_id=pack_id,
+        version=(latest or 0) + 1,
+        status="draft",
+        rules=payload.rules if payload.rules is not None else source_rules,
+        source="user_authored",
+        published_at=None,
+    )
+    session.add(version)
+    await record_audit_event(
+        session,
+        event_type="template_pack.version_created",
+        actor_user_id=user_id,
+        details={"pack_id": str(pack_id), "version": version.version},
+    )
+    await session.commit()
+    await session.refresh(version)
+    return _version_response(version)
+
+
+async def publish_pack_version(
+    session: AsyncSession, *, version_id: UUID, user_id: UUID
+) -> TemplatePackVersionResponse:
+    version = await session.get(TemplatePackVersion, version_id)
+    if version is None:
+        raise LookupError(version_id)
+    if version.status != "draft":
+        raise PackManagementError("Only draft versions can be published")
+    version.status = "published"
+    version.published_at = datetime.now(UTC)
+    await record_audit_event(
+        session,
+        event_type="template_pack.version_published",
+        actor_user_id=user_id,
+        details={"pack_id": str(version.pack_id), "version": version.version},
+    )
+    await session.commit()
+    return _version_response(version)
 
 
 async def _load_pack_version(
@@ -104,6 +263,9 @@ def to_plan_response(
                 prompt=item.prompt,
                 authoritative_copy=item.authoritative_copy,
                 rules=item.rules,
+                model_configuration_id=item.model_configuration_id,
+                reference_ids=[UUID(value) for value in item.reference_ids],
+                provider_parameters=item.provider_parameters,
             )
             for item in sorted(items, key=lambda value: value.position)
         ],
@@ -177,6 +339,122 @@ async def create_production_plan(
     session.add_all(items)
     await session.commit()
     return to_plan_response(plan, items)
+
+
+async def _assert_plan_mutable(session: AsyncSession, plan_id: UUID) -> ProductionPlan:
+    plan = await session.get(ProductionPlan, plan_id)
+    if plan is None:
+        raise LookupError(plan_id)
+    executed = await session.scalar(
+        select(GenerationBatch.id).where(GenerationBatch.production_plan_id == plan_id).limit(1)
+    )
+    if executed is not None:
+        raise PlanMutationError("Executed production plans are immutable")
+    return plan
+
+
+async def _validate_item_references(
+    session: AsyncSession, product_id: UUID, reference_ids: list[UUID]
+) -> None:
+    if not reference_ids:
+        return
+    valid = set(
+        (
+            await session.scalars(
+                select(ProductReference.id).where(
+                    ProductReference.product_id == product_id,
+                    ProductReference.id.in_(reference_ids),
+                )
+            )
+        ).all()
+    )
+    if valid != set(reference_ids):
+        raise PlanMutationError("Every reference_id must belong to the plan product")
+
+
+async def add_plan_item(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    payload: ProductionPlanItemCreate,
+    user_id: UUID,
+) -> ProductionPlanItemResponse:
+    plan = await _assert_plan_mutable(session, plan_id)
+    await _validate_item_references(session, plan.product_id, payload.reference_ids)
+    latest = await session.scalar(
+        select(func.max(ProductionPlanItem.position)).where(ProductionPlanItem.plan_id == plan_id)
+    )
+    item = ProductionPlanItem(
+        plan_id=plan_id,
+        position=(latest or 0) + 1,
+        slot=payload.slot,
+        label=payload.label,
+        requested_view=payload.requested_view,
+        width=payload.width,
+        height=payload.height,
+        prompt=payload.prompt,
+        authoritative_copy=payload.authoritative_copy,
+        rules=payload.rules,
+        model_configuration_id=payload.model_configuration_id,
+        reference_ids=[str(value) for value in payload.reference_ids],
+        provider_parameters=payload.provider_parameters,
+    )
+    session.add(item)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_created",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "slot": item.slot},
+    )
+    await session.commit()
+    await session.refresh(item)
+    return to_plan_response(plan, [item]).items[0]
+
+
+async def update_plan_item(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    item_id: UUID,
+    payload: ProductionPlanItemUpdate,
+    user_id: UUID,
+) -> ProductionPlanItemResponse:
+    plan = await _assert_plan_mutable(session, plan_id)
+    item = await session.get(ProductionPlanItem, item_id)
+    if item is None or item.plan_id != plan_id:
+        raise LookupError(item_id)
+    values = payload.model_dump(exclude_unset=True)
+    if "reference_ids" in values:
+        references = values["reference_ids"] or []
+        await _validate_item_references(session, plan.product_id, references)
+        values["reference_ids"] = [str(value) for value in references]
+    for key, value in values.items():
+        setattr(item, key, value)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_updated",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "item_id": str(item_id), "fields": sorted(values)},
+    )
+    await session.commit()
+    return to_plan_response(plan, [item]).items[0]
+
+
+async def delete_plan_item(
+    session: AsyncSession, *, plan_id: UUID, item_id: UUID, user_id: UUID
+) -> None:
+    await _assert_plan_mutable(session, plan_id)
+    item = await session.get(ProductionPlanItem, item_id)
+    if item is None or item.plan_id != plan_id:
+        raise LookupError(item_id)
+    await session.delete(item)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_deleted",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "item_id": str(item_id)},
+    )
+    await session.commit()
 
 
 async def get_production_plan(

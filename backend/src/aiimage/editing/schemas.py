@@ -10,6 +10,53 @@ class CreateEditProjectRequest(BaseModel):
     name: str | None = Field(default=None, max_length=255)
 
 
+class EditLayerCreate(BaseModel):
+    layer_type: str = Field(pattern="^(source|background|text|image|logo)$")
+    name: str = Field(min_length=1, max_length=255)
+    visible: bool = True
+    locked: bool = False
+    opacity: int = Field(default=100, ge=0, le=100)
+    content: dict[str, Any] = {}
+
+
+class EditLayerUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+    visible: bool | None = None
+    locked: bool | None = None
+    opacity: int | None = Field(default=None, ge=0, le=100)
+    content: dict[str, Any] | None = None
+
+
+class EditLayerResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    position: int
+    layer_type: str
+    name: str
+    visible: bool
+    locked: bool
+    opacity: int
+    content: dict[str, Any]
+
+
+class LayerReorderRequest(BaseModel):
+    layer_ids: list[UUID]
+
+
+class SelectionRequest(BaseModel):
+    revision_id: UUID
+    selection_type: str = Field(pattern="^(foreground|background|person|garment)$")
+    threshold: int = Field(default=42, ge=1, le=255)
+
+
+class SelectionResponse(BaseModel):
+    selection_type: str
+    mask_asset_id: UUID
+    sha256: str
+    width: int
+    height: int
+
+
 class EditRevisionResponse(BaseModel):
     id: UUID
     project_id: UUID
@@ -36,6 +83,7 @@ class EditProjectResponse(BaseModel):
     source_asset_id: UUID
     created_at: datetime
     revisions: list[EditRevisionResponse]
+    layers: list[EditLayerResponse] = []
 
 
 class EditEvidenceResponse(BaseModel):

@@ -16,7 +16,9 @@ class PackKind(StrEnum):
 
 
 class PackStatus(StrEnum):
+    DRAFT = "draft"
     PUBLISHED = "published"
+    ARCHIVED = "archived"
 
 
 class TemplatePack(Base):
@@ -43,9 +45,7 @@ class TemplatePackVersion(Base):
     status: Mapped[str] = mapped_column(String(30), default=PackStatus.PUBLISHED.value)
     rules: Mapped[dict[str, Any]] = mapped_column(JSON)
     source: Mapped[str] = mapped_column(String(100), default="first_party_default")
-    published_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ProductionPlan(Base):
@@ -88,3 +88,8 @@ class ProductionPlanItem(Base):
     prompt: Mapped[str] = mapped_column(Text)
     authoritative_copy: Mapped[str | None] = mapped_column(Text, nullable=True)
     rules: Mapped[dict[str, Any]] = mapped_column(JSON)
+    model_configuration_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("model_configurations.id"), nullable=True
+    )
+    reference_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
+    provider_parameters: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)

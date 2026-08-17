@@ -39,11 +39,39 @@ def process_mask(
     return output.getvalue()
 
 
+def select_by_corner_color(
+    source: bytes, *, foreground: bool, threshold: int = 42
+) -> tuple[bytes, int, int]:
+    try:
+        with Image.open(BytesIO(source)) as opened:
+            image = opened.convert("RGB")
+    except Exception as error:
+        raise EditImageError("Source is not a decodable image") from error
+    samples = [
+        image.getpixel((0, 0)),
+        image.getpixel((image.width - 1, 0)),
+        image.getpixel((0, image.height - 1)),
+        image.getpixel((image.width - 1, image.height - 1)),
+    ]
+    background = tuple(round(sum(sample[index] for sample in samples) / 4) for index in range(3))
+    mask = Image.new("L", image.size)
+    pixels = []
+    for pixel in image.getdata():
+        distance = sum((pixel[index] - background[index]) ** 2 for index in range(3)) ** 0.5
+        selected = distance >= threshold if foreground else distance < threshold
+        pixels.append(255 if selected else 0)
+    mask.putdata(pixels)
+    buffer = BytesIO()
+    mask.save(buffer, format="PNG", optimize=False)
+    return buffer.getvalue(), image.width, image.height
+
+
 def compose_image(
     source: bytes,
     *,
     parameters: dict[str, Any],
     logo: bytes | None = None,
+    image_layers: list[tuple[bytes, dict[str, Any]]] | None = None,
 ) -> tuple[bytes, str]:
     try:
         with Image.open(BytesIO(source)) as opened:
@@ -93,6 +121,22 @@ def compose_image(
         background.alpha_composite(
             logo_image,
             (int(parameters.get("logo_x", 24)), int(parameters.get("logo_y", 24))),
+        )
+    for layer_content, layer in image_layers or []:
+        with Image.open(BytesIO(layer_content)) as opened_layer:
+            layer_image = opened_layer.convert("RGBA")
+        width = int(layer.get("width", layer_image.width))
+        height = max(1, round(layer_image.height * width / layer_image.width))
+        layer_image = layer_image.resize((width, height), Image.Resampling.LANCZOS)
+        opacity = max(0.0, min(1.0, float(layer.get("opacity", 1))))
+        layer_image.putalpha(
+            layer_image.getchannel("A").point(
+                lambda value, layer_opacity=opacity: round(value * layer_opacity)
+            )
+        )
+        background.alpha_composite(
+            layer_image,
+            (int(layer.get("x", 0)), int(layer.get("y", 0))),
         )
     buffer = BytesIO()
     background.save(buffer, format="PNG", optimize=False)

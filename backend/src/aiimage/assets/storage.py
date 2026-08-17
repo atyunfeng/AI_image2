@@ -8,8 +8,8 @@ import boto3
 
 from aiimage.config import get_settings
 
-ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp"}
-MAX_IMAGE_BYTES = 25 * 1024 * 1024
+ALLOWED_ASSET_TYPES = {"image/jpeg", "image/png", "image/webp", "application/zip"}
+MAX_ASSET_BYTES = 100 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -29,10 +29,10 @@ class ObjectStore(Protocol):
 
 
 def describe_object(*, content: bytes, mime_type: str) -> StoredObject:
-    if mime_type not in ALLOWED_IMAGE_TYPES:
-        raise ValueError(f"Unsupported image MIME type: {mime_type}")
-    if not content or len(content) > MAX_IMAGE_BYTES:
-        raise ValueError("Image must be between 1 byte and 25 MiB")
+    if mime_type not in ALLOWED_ASSET_TYPES:
+        raise ValueError(f"Unsupported asset MIME type: {mime_type}")
+    if not content or len(content) > MAX_ASSET_BYTES:
+        raise ValueError("Asset must be between 1 byte and 100 MiB")
     digest = hashlib.sha256(content).hexdigest()
     return StoredObject(
         object_key=f"sha256/{digest[:2]}/{digest}",
@@ -97,4 +97,3 @@ class S3ObjectStore:
 @lru_cache
 def get_object_store() -> ObjectStore:
     return S3ObjectStore()
-

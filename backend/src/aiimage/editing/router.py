@@ -2,7 +2,7 @@ import json
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,15 +15,27 @@ from aiimage.editing.models import EditProject
 from aiimage.editing.schemas import (
     CreateEditProjectRequest,
     EditEvidenceResponse,
+    EditLayerCreate,
+    EditLayerResponse,
+    EditLayerUpdate,
     EditProjectResponse,
     EditRevisionResponse,
+    LayerReorderRequest,
+    SelectionRequest,
+    SelectionResponse,
 )
 from aiimage.editing.service import (
     EditValidationError,
     create_ai_revision,
     create_composed_revision,
     create_edit_project,
+    create_layer,
+    create_selection,
+    delete_layer,
+    duplicate_layer,
     project_response,
+    reorder_layers,
+    update_layer,
 )
 from aiimage.workflow.queue import QueueHints, get_queue_hints
 
@@ -125,6 +137,109 @@ async def create_composed_revision_endpoint(
         raise HTTPException(status_code=422, detail=str(error)) from error
     response = await project_response(session, await session.get(EditProject, project_id))
     return next(item for item in response.revisions if item.id == revision.id)
+
+
+@router.post("/{project_id}/selections", response_model=SelectionResponse, status_code=201)
+async def create_selection_endpoint(
+    project_id: UUID,
+    payload: SelectionRequest,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    store: Annotated[ObjectStore, Depends(get_object_store)],
+) -> SelectionResponse:
+    try:
+        return await create_selection(
+            session,
+            store,
+            project_id=project_id,
+            revision_id=payload.revision_id,
+            selection_type=payload.selection_type,
+            threshold=payload.threshold,
+            user_id=user.id,
+        )
+    except EditValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+
+@router.post("/{project_id}/layers", response_model=EditLayerResponse, status_code=201)
+async def create_layer_endpoint(
+    project_id: UUID,
+    payload: EditLayerCreate,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EditLayerResponse:
+    try:
+        layer = await create_layer(session, project_id=project_id, payload=payload, user_id=user.id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Edit project not found") from error
+    return EditLayerResponse.model_validate(layer, from_attributes=True)
+
+
+@router.patch("/{project_id}/layers/{layer_id}", response_model=EditLayerResponse)
+async def update_layer_endpoint(
+    project_id: UUID,
+    layer_id: UUID,
+    payload: EditLayerUpdate,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EditLayerResponse:
+    try:
+        layer = await update_layer(
+            session, project_id=project_id, layer_id=layer_id, payload=payload, user_id=user.id
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Edit layer not found") from error
+    except EditValidationError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return EditLayerResponse.model_validate(layer, from_attributes=True)
+
+
+@router.post("/{project_id}/layers/{layer_id}/duplicate", response_model=EditLayerResponse, status_code=201)
+async def duplicate_layer_endpoint(
+    project_id: UUID,
+    layer_id: UUID,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> EditLayerResponse:
+    try:
+        layer = await duplicate_layer(
+            session, project_id=project_id, layer_id=layer_id, user_id=user.id
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Edit layer not found") from error
+    return EditLayerResponse.model_validate(layer, from_attributes=True)
+
+
+@router.post("/{project_id}/layers/reorder", response_model=list[EditLayerResponse])
+async def reorder_layers_endpoint(
+    project_id: UUID,
+    payload: LayerReorderRequest,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[EditLayerResponse]:
+    try:
+        layers = await reorder_layers(
+            session, project_id=project_id, layer_ids=payload.layer_ids, user_id=user.id
+        )
+    except EditValidationError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+    return [EditLayerResponse.model_validate(layer, from_attributes=True) for layer in layers]
+
+
+@router.delete("/{project_id}/layers/{layer_id}", status_code=204)
+async def delete_layer_endpoint(
+    project_id: UUID,
+    layer_id: UUID,
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    try:
+        await delete_layer(session, project_id=project_id, layer_id=layer_id, user_id=user.id)
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Edit layer not found") from error
+    except EditValidationError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return Response(status_code=204)
 
 
 @router.get("/revisions/{revision_id}/evidence", response_model=EditEvidenceResponse)

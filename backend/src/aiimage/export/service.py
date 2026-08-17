@@ -1,3 +1,4 @@
+import hashlib
 import json
 from io import BytesIO
 from uuid import UUID
@@ -8,8 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore
+from aiimage.audit.service import record_audit_event
 from aiimage.auth.models import User
 from aiimage.catalog.models import Product, ProductReference
+from aiimage.export.models import ExportRecord
 from aiimage.models.models import ModelConfiguration
 from aiimage.review.models import ReviewDecision
 from aiimage.workflow.models import GenerationBatch, GenerationStep
@@ -25,6 +28,7 @@ async def build_export_zip(
     store: ObjectStore,
     *,
     batch_id: UUID,
+    user_id: UUID | None = None,
 ) -> bytes:
     batch = await session.get(GenerationBatch, batch_id)
     if batch is None:
@@ -110,7 +114,55 @@ async def build_export_zip(
     with ZipFile(archive_buffer, "w", ZIP_DEFLATED) as archive:
         archive.writestr("manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2))
         archive.writestr(filename, image)
+    content = archive_buffer.getvalue()
+    stored = await store.put(content=content, mime_type="application/zip")
+    archive_asset = await session.scalar(select(Asset).where(Asset.sha256 == stored.sha256))
+    if archive_asset is None:
+        archive_asset = Asset(
+            object_key=stored.object_key,
+            sha256=stored.sha256,
+            size_bytes=stored.size_bytes,
+            mime_type=stored.mime_type,
+            parent_asset_id=output.id,
+            derivation_operation="approved_export_zip",
+            derivation_parameters={"batch_id": str(batch.id)},
+        )
+        session.add(archive_asset)
+        await session.flush()
+    manifest_sha256 = hashlib.sha256(
+        json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode()
+    ).hexdigest()
+    actor_id = user_id or decision.reviewer_user_id
+    record = ExportRecord(
+        batch_id=batch.id,
+        archive_asset_id=archive_asset.id,
+        manifest_sha256=manifest_sha256,
+        created_by_user_id=actor_id,
+    )
+    session.add(record)
+    await record_audit_event(
+        session,
+        event_type="batch.exported",
+        actor_user_id=actor_id,
+        details={
+            "batch_id": str(batch.id),
+            "archive_asset_id": str(archive_asset.id),
+            "manifest_sha256": manifest_sha256,
+        },
+    )
     if batch.status == BatchStatus.APPROVED.value:
         batch.status = BatchStatus.EXPORTED.value
-        await session.commit()
-    return archive_buffer.getvalue()
+    await session.commit()
+    return content
+
+
+async def list_export_records(session: AsyncSession, batch_id: UUID) -> list[ExportRecord]:
+    return list(
+        (
+            await session.scalars(
+                select(ExportRecord)
+                .where(ExportRecord.batch_id == batch_id)
+                .order_by(ExportRecord.created_at.desc(), ExportRecord.id.desc())
+            )
+        ).all()
+    )

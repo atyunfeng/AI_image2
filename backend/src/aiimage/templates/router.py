@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.api.dependencies import get_session
@@ -10,13 +10,30 @@ from aiimage.auth.models import Role, User
 from aiimage.templates.compiler import PlanCompilationError
 from aiimage.templates.schemas import (
     CompilePlanRequest,
+    ManagedTemplatePackResponse,
+    ProductionPlanItemCreate,
+    ProductionPlanItemResponse,
+    ProductionPlanItemUpdate,
     ProductionPlanResponse,
+    TemplatePackCreate,
     TemplatePackResponse,
+    TemplatePackVersionCreate,
+    TemplatePackVersionResponse,
 )
 from aiimage.templates.service import (
+    DuplicatePackSlugError,
+    PackManagementError,
+    PlanMutationError,
+    add_plan_item,
+    create_pack_version,
     create_production_plan,
+    create_template_pack,
+    delete_plan_item,
     get_production_plan,
+    list_managed_packs,
     list_published_packs,
+    publish_pack_version,
+    update_plan_item,
 )
 from aiimage.workflow.queue import QueueHints, get_queue_hints
 from aiimage.workflow.schemas import BatchResponse, ExecuteProductionPlanRequest
@@ -35,6 +52,64 @@ async def list_template_packs(
 ) -> list[TemplatePackResponse]:
     del user
     return await list_published_packs(session)
+
+
+TemplateManager = Annotated[User, Depends(require_roles(Role.ADMIN, Role.DESIGNER))]
+
+
+@router.get("/manage", response_model=list[ManagedTemplatePackResponse])
+async def manage_template_packs(
+    user: TemplateManager,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[ManagedTemplatePackResponse]:
+    del user
+    return await list_managed_packs(session)
+
+
+@router.post("", response_model=ManagedTemplatePackResponse, status_code=201)
+async def author_template_pack(
+    payload: TemplatePackCreate,
+    user: TemplateManager,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ManagedTemplatePackResponse:
+    try:
+        return await create_template_pack(session, payload=payload, user_id=user.id)
+    except DuplicatePackSlugError as exc:
+        raise HTTPException(status_code=409, detail="Template pack slug already exists") from exc
+
+
+@router.post("/{pack_id}/versions", response_model=TemplatePackVersionResponse, status_code=201)
+async def author_template_pack_version(
+    pack_id: UUID,
+    payload: TemplatePackVersionCreate,
+    user: TemplateManager,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TemplatePackVersionResponse:
+    try:
+        return await create_pack_version(
+            session, pack_id=pack_id, payload=payload, user_id=user.id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Template pack not found") from exc
+    except PackManagementError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+version_router = APIRouter(prefix="/template-pack-versions", tags=["template-packs"])
+
+
+@version_router.post("/{version_id}/publish", response_model=TemplatePackVersionResponse)
+async def publish_template_pack_version(
+    version_id: UUID,
+    user: TemplateManager,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TemplatePackVersionResponse:
+    try:
+        return await publish_pack_version(session, version_id=version_id, user_id=user.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Template pack version not found") from exc
+    except PackManagementError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 plan_router = APIRouter(prefix="/production-plans", tags=["production-plans"])
@@ -65,6 +140,59 @@ async def read_production_plan(
     if plan is None:
         raise HTTPException(status_code=404, detail="Production plan not found")
     return plan
+
+
+@plan_router.post(
+    "/{plan_id}/items", response_model=ProductionPlanItemResponse, status_code=201
+)
+async def create_production_plan_item(
+    plan_id: UUID,
+    payload: ProductionPlanItemCreate,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProductionPlanItemResponse:
+    try:
+        return await add_plan_item(session, plan_id=plan_id, payload=payload, user_id=user.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@plan_router.patch(
+    "/{plan_id}/items/{item_id}", response_model=ProductionPlanItemResponse
+)
+async def patch_production_plan_item(
+    plan_id: UUID,
+    item_id: UUID,
+    payload: ProductionPlanItemUpdate,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProductionPlanItemResponse:
+    try:
+        return await update_plan_item(
+            session, plan_id=plan_id, item_id=item_id, payload=payload, user_id=user.id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan item not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@plan_router.delete("/{plan_id}/items/{item_id}", status_code=204)
+async def remove_production_plan_item(
+    plan_id: UUID,
+    item_id: UUID,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    try:
+        await delete_plan_item(session, plan_id=plan_id, item_id=item_id, user_id=user.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan item not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 @plan_router.post(

@@ -9,10 +9,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore
+from aiimage.audit.service import record_audit_event
 from aiimage.editing.evidence import create_edit_evidence
-from aiimage.editing.images import compose_image, process_mask
-from aiimage.editing.models import EditProject, EditRevision
-from aiimage.editing.schemas import EditProjectResponse, EditRevisionResponse
+from aiimage.editing.images import compose_image, process_mask, select_by_corner_color
+from aiimage.editing.models import EditLayer, EditProject, EditRevision
+from aiimage.editing.schemas import (
+    EditLayerCreate,
+    EditLayerResponse,
+    EditLayerUpdate,
+    EditProjectResponse,
+    EditRevisionResponse,
+    SelectionResponse,
+)
 from aiimage.models.domain import Capability
 from aiimage.models.models import ModelConfiguration
 from aiimage.workflow.models import GenerationBatch, GenerationStep
@@ -63,6 +71,26 @@ async def create_edit_project(
         created_by_user_id=user_id,
     )
     session.add(root)
+    session.add_all(
+        [
+            EditLayer(
+                project_id=project.id,
+                position=1,
+                layer_type="background",
+                name="背景",
+                locked=False,
+                content={"color": "#ffffff", "blur": 0},
+            ),
+            EditLayer(
+                project_id=project.id,
+                position=2,
+                layer_type="source",
+                name="商品主体",
+                locked=True,
+                content={"x": 0, "y": 0, "scale": 1, "rotation": 0},
+            ),
+        ]
+    )
     await session.commit()
     await session.refresh(project)
     return project
@@ -219,8 +247,56 @@ async def create_composed_revision(
 ) -> EditRevision:
     project, parent, source = await _ready_parent(session, project_id, parent_revision_id)
     source_content = await store.get(object_key=source.object_key)
+    image_layers: list[tuple[bytes, dict]] = []
+    if parameters.get("use_project_layers"):
+        layers = list(
+            (
+                await session.scalars(
+                    select(EditLayer)
+                    .where(EditLayer.project_id == project.id, EditLayer.visible.is_(True))
+                    .order_by(EditLayer.position)
+                )
+            ).all()
+        )
+        text_layers = []
+        background_layer = next((layer for layer in layers if layer.layer_type == "background"), None)
+        source_layer = next((layer for layer in layers if layer.layer_type == "source"), None)
+        if background_layer:
+            parameters["background_color"] = background_layer.content.get("color", "#ffffff")
+            parameters["background_blur"] = background_layer.content.get("blur", 0)
+        if source_layer:
+            parameters.update(
+                {
+                    key: source_layer.content.get(key, default)
+                    for key, default in {"x": 0, "y": 0, "scale": 1, "rotation": 0}.items()
+                }
+            )
+        for layer in layers:
+            if layer.layer_type == "text" and layer.content.get("text"):
+                text_layers.append({**layer.content, "opacity": layer.opacity / 100})
+            if layer.layer_type in {"image", "logo"} and layer.content.get("asset_id"):
+                asset = await session.get(Asset, UUID(str(layer.content["asset_id"])))
+                if asset:
+                    image_layers.append(
+                        (
+                            await store.get(object_key=asset.object_key),
+                            {**layer.content, "opacity": layer.opacity / 100},
+                        )
+                    )
+        parameters["text_layers"] = text_layers
+        parameters["layers"] = [
+            {
+                "id": str(layer.id),
+                "position": layer.position,
+                "type": layer.layer_type,
+                "name": layer.name,
+                "opacity": layer.opacity,
+                "content": layer.content,
+            }
+            for layer in layers
+        ]
     output_content, mime_type = compose_image(
-        source_content, parameters=parameters, logo=logo_content
+        source_content, parameters=parameters, logo=logo_content, image_layers=image_layers
     )
     stored_asset = await _asset_from_content(
         session, store, content=output_content, mime_type=mime_type
@@ -312,6 +388,15 @@ async def project_response(
         ).all()
         if batch.edit_revision_id is not None
     }
+    layers = list(
+        (
+            await session.scalars(
+                select(EditLayer)
+                .where(EditLayer.project_id == project.id)
+                .order_by(EditLayer.position)
+            )
+        ).all()
+    )
     return EditProjectResponse(
         id=project.id,
         name=project.name,
@@ -339,4 +424,184 @@ async def project_response(
             )
             for revision in revisions
         ],
+        layers=[EditLayerResponse.model_validate(layer, from_attributes=True) for layer in layers],
+    )
+
+
+async def create_layer(
+    session: AsyncSession,
+    *,
+    project_id: UUID,
+    payload: EditLayerCreate,
+    user_id: UUID,
+) -> EditLayer:
+    if await session.get(EditProject, project_id) is None:
+        raise LookupError(project_id)
+    latest = await session.scalar(
+        select(func.max(EditLayer.position)).where(EditLayer.project_id == project_id)
+    )
+    layer = EditLayer(
+        project_id=project_id,
+        position=(latest or 0) + 1,
+        layer_type=payload.layer_type,
+        name=payload.name,
+        visible=payload.visible,
+        locked=payload.locked,
+        opacity=payload.opacity,
+        content=payload.content,
+    )
+    session.add(layer)
+    await record_audit_event(
+        session,
+        event_type="edit.layer_created",
+        actor_user_id=user_id,
+        details={"project_id": str(project_id), "type": layer.layer_type},
+    )
+    await session.commit()
+    await session.refresh(layer)
+    return layer
+
+
+async def update_layer(
+    session: AsyncSession,
+    *,
+    project_id: UUID,
+    layer_id: UUID,
+    payload: EditLayerUpdate,
+    user_id: UUID,
+) -> EditLayer:
+    layer = await session.get(EditLayer, layer_id)
+    if layer is None or layer.project_id != project_id:
+        raise LookupError(layer_id)
+    values = payload.model_dump(exclude_unset=True)
+    if layer.locked and set(values) - {"locked", "visible"}:
+        raise EditValidationError("Unlock the layer before changing its properties")
+    for key, value in values.items():
+        setattr(layer, key, value)
+    await record_audit_event(
+        session,
+        event_type="edit.layer_updated",
+        actor_user_id=user_id,
+        details={"project_id": str(project_id), "layer_id": str(layer_id), "fields": sorted(values)},
+    )
+    await session.commit()
+    return layer
+
+
+async def duplicate_layer(
+    session: AsyncSession, *, project_id: UUID, layer_id: UUID, user_id: UUID
+) -> EditLayer:
+    source = await session.get(EditLayer, layer_id)
+    if source is None or source.project_id != project_id:
+        raise LookupError(layer_id)
+    return await create_layer(
+        session,
+        project_id=project_id,
+        payload=EditLayerCreate(
+            layer_type=source.layer_type,
+            name=f"{source.name} 副本",
+            visible=source.visible,
+            locked=False,
+            opacity=source.opacity,
+            content=source.content,
+        ),
+        user_id=user_id,
+    )
+
+
+async def delete_layer(
+    session: AsyncSession, *, project_id: UUID, layer_id: UUID, user_id: UUID
+) -> None:
+    layer = await session.get(EditLayer, layer_id)
+    if layer is None or layer.project_id != project_id:
+        raise LookupError(layer_id)
+    if layer.locked:
+        raise EditValidationError("Unlock the layer before deleting it")
+    await session.delete(layer)
+    await record_audit_event(
+        session,
+        event_type="edit.layer_deleted",
+        actor_user_id=user_id,
+        details={"project_id": str(project_id), "layer_id": str(layer_id)},
+    )
+    await session.commit()
+
+
+async def reorder_layers(
+    session: AsyncSession, *, project_id: UUID, layer_ids: list[UUID], user_id: UUID
+) -> list[EditLayer]:
+    layers = list(
+        (
+            await session.scalars(select(EditLayer).where(EditLayer.project_id == project_id))
+        ).all()
+    )
+    if set(layer_ids) != {layer.id for layer in layers}:
+        raise EditValidationError("layer_ids must contain every project layer exactly once")
+    by_id = {layer.id: layer for layer in layers}
+    for index, layer_id in enumerate(layer_ids, start=1):
+        by_id[layer_id].position = -index
+    await session.flush()
+    for index, layer_id in enumerate(layer_ids, start=1):
+        by_id[layer_id].position = index
+    await record_audit_event(
+        session,
+        event_type="edit.layers_reordered",
+        actor_user_id=user_id,
+        details={"project_id": str(project_id), "layer_ids": [str(value) for value in layer_ids]},
+    )
+    await session.commit()
+    return [by_id[layer_id] for layer_id in layer_ids]
+
+
+async def create_selection(
+    session: AsyncSession,
+    store: ObjectStore,
+    *,
+    project_id: UUID,
+    revision_id: UUID,
+    selection_type: str,
+    threshold: int,
+    user_id: UUID,
+) -> SelectionResponse:
+    project, revision, asset = await _ready_parent(session, project_id, revision_id)
+    del project
+    if selection_type in {"person", "garment"}:
+        configured = await session.scalar(
+            select(ModelConfiguration.id).where(
+                ModelConfiguration.is_enabled.is_(True),
+                ModelConfiguration.capabilities.contains([Capability.SEGMENT.value]),
+            )
+        )
+        if configured is None:
+            raise EditValidationError(
+                "Person and garment selection require an enabled segment provider"
+            )
+        raise EditValidationError("Semantic segment provider execution is not available locally")
+    content = await store.get(object_key=asset.object_key)
+    mask, width, height = select_by_corner_color(
+        content, foreground=selection_type == "foreground", threshold=threshold
+    )
+    mask_asset = await _asset_from_content(session, store, content=mask, mime_type="image/png")
+    if mask_asset.parent_asset_id is None:
+        mask_asset.parent_asset_id = asset.id
+        mask_asset.derivation_operation = f"select_{selection_type}"
+        mask_asset.derivation_parameters = {"threshold": threshold, "revision_id": str(revision.id)}
+    await record_audit_event(
+        session,
+        event_type="edit.selection_created",
+        actor_user_id=user_id,
+        details={
+            "project_id": str(project_id),
+            "revision_id": str(revision.id),
+            "selection_type": selection_type,
+            "mask_asset_id": str(mask_asset.id),
+        },
+    )
+    await session.commit()
+    return SelectionResponse(
+        selection_type=selection_type,
+        mask_asset_id=mask_asset.id,
+        sha256=mask_asset.sha256,
+        width=width,
+        height=height,
     )
