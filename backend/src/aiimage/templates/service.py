@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from uuid import UUID
 
 from sqlalchemy import select
@@ -35,6 +36,7 @@ async def ensure_first_party_packs(session: AsyncSession) -> None:
                 version=1,
                 rules=preset["rules"],
                 source="first_party_default",
+                published_at=datetime.now(UTC),
             )
         )
     await session.commit()

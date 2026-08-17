@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,14 +10,26 @@ from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore, get_object_store
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
-from aiimage.catalog.models import Product, ProductReference, ReferenceView
+from aiimage.catalog.models import Product, ProductReference, ReferenceView, TruthAnchor
 from aiimage.catalog.schemas import (
     ProductCreate,
     ProductDetailResponse,
     ProductReferenceResponse,
     ProductResponse,
+    ProductUpdate,
+    TruthAnchorCreate,
+    TruthAnchorResponse,
 )
-from aiimage.catalog.service import DuplicateSkuError, add_reference, create_product
+from aiimage.catalog.service import (
+    DuplicateSkuError,
+    add_reference,
+    analyze_truth_anchor,
+    archive_product,
+    create_product,
+    create_truth_anchor,
+    get_product_history,
+    update_product,
+)
 
 router = APIRouter(prefix="/products", tags=["products"])
 CatalogUser = Annotated[
@@ -32,7 +44,15 @@ async def list_products(
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[ProductResponse]:
     del user
-    products = list((await session.scalars(select(Product).order_by(Product.created_at.desc()))).all())
+    products = list(
+        (
+            await session.scalars(
+                select(Product)
+                .where(Product.archived_at.is_(None))
+                .order_by(Product.created_at.desc())
+            )
+        ).all()
+    )
     return [ProductResponse.model_validate(product) for product in products]
 
 
@@ -44,7 +64,7 @@ async def get_product(
 ) -> ProductDetailResponse:
     del user
     product = await session.get(Product, product_id)
-    if product is None:
+    if product is None or product.archived_at is not None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Product not found")
     references = list(
         (
@@ -61,11 +81,21 @@ async def get_product(
             )
         ).all()
     }
+    anchors = list(
+        (
+            await session.scalars(
+                select(TruthAnchor)
+                .where(TruthAnchor.product_id == product.id)
+                .order_by(TruthAnchor.version.desc())
+            )
+        ).all()
+    )
     return ProductDetailResponse(
         id=product.id,
         sku=product.sku,
         name=product.name,
         category=product.category,
+        brand=product.brand,
         references=[
             ProductReferenceResponse(
                 id=reference.id,
@@ -77,6 +107,9 @@ async def get_product(
             )
             for reference in references
         ],
+        latest_truth_anchor=TruthAnchorResponse.model_validate(anchors[0]) if anchors else None,
+        truth_anchors=[TruthAnchorResponse.model_validate(anchor) for anchor in anchors],
+        history=await get_product_history(session, product.id),
     )
 
 
@@ -91,6 +124,75 @@ async def create_product_endpoint(
     except DuplicateSkuError as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="SKU already exists") from error
     return ProductResponse.model_validate(product)
+
+
+@router.patch("/{product_id}", response_model=ProductResponse)
+async def update_product_endpoint(
+    product_id: UUID,
+    payload: ProductUpdate,
+    user: CatalogUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProductResponse:
+    product = await session.get(Product, product_id)
+    if product is None or product.archived_at is not None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return ProductResponse.model_validate(
+        await update_product(session, product=product, payload=payload, user_id=user.id)
+    )
+
+
+@router.delete("/{product_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def archive_product_endpoint(
+    product_id: UUID,
+    user: CatalogUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    product = await session.get(Product, product_id)
+    if product is None or product.archived_at is not None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await archive_product(session, product=product, user_id=user.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post(
+    "/{product_id}/truth-anchors",
+    response_model=TruthAnchorResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def save_truth_anchor(
+    product_id: UUID,
+    payload: TruthAnchorCreate,
+    user: CatalogUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> TruthAnchorResponse:
+    product = await session.get(Product, product_id)
+    if product is None or product.archived_at is not None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    anchor = await create_truth_anchor(
+        session, product=product, document=payload.document, user_id=user.id
+    )
+    return TruthAnchorResponse.model_validate(anchor)
+
+
+@router.post(
+    "/{product_id}/truth-anchors/analyze",
+    response_model=TruthAnchorResponse,
+    status_code=status.HTTP_201_CREATED,
+)
+async def analyze_product_truth_anchor(
+    product_id: UUID,
+    user: CatalogUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    store: Annotated[ObjectStore, Depends(get_object_store)],
+) -> TruthAnchorResponse:
+    product = await session.get(Product, product_id)
+    if product is None or product.archived_at is not None:
+        raise HTTPException(status_code=404, detail="Product not found")
+    try:
+        anchor = await analyze_truth_anchor(session, store, product=product, user_id=user.id)
+    except (ValueError, KeyError) as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return TruthAnchorResponse.model_validate(anchor)
 
 
 @router.post(

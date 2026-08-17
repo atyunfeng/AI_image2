@@ -28,6 +28,9 @@ class GenerationBatch(Base):
     edit_revision_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("edit_revisions.id"), nullable=True, unique=True
     )
+    source_batch_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("generation_batches.id"), nullable=True, index=True
+    )
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"))
     model_configuration_id: Mapped[UUID] = mapped_column(ForeignKey("model_configurations.id"))
     requested_view: Mapped[str] = mapped_column(String(30))
@@ -56,3 +59,5 @@ class GenerationStep(Base):
     output_asset_id: Mapped[UUID | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     estimated_cost_minor: Mapped[int] = mapped_column(default=0)
     error_classification: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

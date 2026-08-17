@@ -70,11 +70,11 @@
 - `POST /products/{id}/truth-anchors/analyze` creates a deterministic image-metadata anchor version; `POST /products/{id}/truth-anchors` saves a manually confirmed document as a new immutable version.
 - Bulk import accepts `.csv` and `.xlsx`, normalizes both into the existing row dictionary contract and preserves per-row isolation.
 
-- [ ] Add failing lifecycle, anchor-version and XLSX parsing tests.
-- [ ] Add soft-delete/brand fields and immutable truth-anchor services with Pillow color/size/reference analysis.
-- [ ] Add `openpyxl` and route CSV/XLSX by filename and MIME type.
-- [ ] Add product management and truth-anchor history UI; show generation, edit, review and export activity for the SKU.
-- [ ] Run catalog/bulk tests and commit as `feat: complete product truth management`.
+- [x] Add failing lifecycle, anchor-version and XLSX parsing tests.
+- [x] Add soft-delete/brand fields and immutable truth-anchor services with Pillow color/size/reference analysis.
+- [x] Add `openpyxl` and route CSV/XLSX by filename and MIME type.
+- [x] Add product management and truth-anchor history UI; show generation, edit, review and export activity for the SKU.
+- [x] Run catalog/bulk tests and commit as `feat: complete product truth management`.
 
 ### Task 3: Template pack authoring and immutable publishing
 

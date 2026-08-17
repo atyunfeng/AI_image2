@@ -74,7 +74,7 @@ async def import_bulk_job(
     file: Annotated[UploadFile, File()] = None,
 ) -> BulkJobResponse:
     if file is None:
-        raise HTTPException(status_code=422, detail="CSV file is required")
+        raise HTTPException(status_code=422, detail="CSV or XLSX file is required")
     try:
         return await create_bulk_job(
             session,

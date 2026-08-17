@@ -58,3 +58,21 @@ class EditEvidence(Base):
     measured: Mapped[dict[str, Any]] = mapped_column(JSON)
     human_review_checks: Mapped[list[str]] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class EditLayer(Base):
+    __tablename__ = "edit_layers"
+    __table_args__ = (UniqueConstraint("project_id", "position"),)
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("edit_projects.id", ondelete="CASCADE"), index=True
+    )
+    position: Mapped[int]
+    layer_type: Mapped[str] = mapped_column(String(30))
+    name: Mapped[str] = mapped_column(String(255))
+    visible: Mapped[bool] = mapped_column(default=True)
+    locked: Mapped[bool] = mapped_column(default=False)
+    opacity: Mapped[int] = mapped_column(default=100)
+    content: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -1,7 +1,9 @@
 import csv
-from io import StringIO
+from io import BytesIO, StringIO
+from pathlib import Path
 from uuid import UUID
 
+from openpyxl import load_workbook
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -51,6 +53,44 @@ def parse_csv(content: bytes) -> list[dict[str, str]]:
     if len(rows) > MAX_ROWS:
         raise BulkImportError(f"CSV exceeds {MAX_ROWS} rows")
     return rows
+
+
+def parse_xlsx(content: bytes) -> list[dict[str, str]]:
+    if len(content) > MAX_CSV_BYTES:
+        raise BulkImportError("XLSX exceeds 2 MiB")
+    try:
+        workbook = load_workbook(BytesIO(content), read_only=True, data_only=True)
+        sheet = workbook.active
+        values = sheet.iter_rows(values_only=True)
+        headers = [str(value or "").strip() for value in next(values)]
+    except (OSError, StopIteration, ValueError) as exc:
+        raise BulkImportError("XLSX is empty or invalid") from exc
+    missing = REQUIRED_COLUMNS - set(headers)
+    if missing:
+        raise BulkImportError(f"Missing XLSX columns: {', '.join(sorted(missing))}")
+    rows = [
+        {
+            header: "" if value is None else str(value).strip()
+            for header, value in zip(headers, values_row, strict=False)
+            if header
+        }
+        for values_row in values
+        if any(value is not None and str(value).strip() for value in values_row)
+    ]
+    if not rows:
+        raise BulkImportError("XLSX contains no data rows")
+    if len(rows) > MAX_ROWS:
+        raise BulkImportError(f"XLSX exceeds {MAX_ROWS} rows")
+    return rows
+
+
+def parse_import(filename: str, content: bytes) -> list[dict[str, str]]:
+    suffix = Path(filename).suffix.lower()
+    if suffix == ".csv":
+        return parse_csv(content)
+    if suffix == ".xlsx":
+        return parse_xlsx(content)
+    raise BulkImportError("Only .csv and .xlsx files are supported")
 
 
 async def _pack_version_by_slug(
@@ -138,7 +178,7 @@ async def create_bulk_job(
     brand_pack_version_id: UUID,
     user_id: UUID,
 ) -> BulkJobResponse:
-    parsed_rows = parse_csv(content)
+    parsed_rows = parse_import(filename, content)
     await ensure_first_party_packs(session)
     model = await session.get(ModelConfiguration, model_configuration_id)
     category_pack = await session.get(TemplatePackVersion, category_pack_version_id)
@@ -206,6 +246,7 @@ async def create_bulk_job(
                     sku=row["sku"].upper(),
                     name=row["name"],
                     category=category.value,
+                    brand=row.get("brand") or None,
                     created_by_user_id=user_id,
                 )
                 session.add(product)
@@ -214,7 +255,7 @@ async def create_bulk_job(
                     TruthAnchor(
                         product_id=product.id,
                         version=1,
-                        document={"source": "bulk_csv", "bulk_job_id": str(job_id)},
+                        document={"source": "bulk_import", "bulk_job_id": str(job_id)},
                         created_by_user_id=user_id,
                     )
                 )
