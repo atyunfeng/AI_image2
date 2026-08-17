@@ -14,7 +14,7 @@ from aiimage.talent.models import ModelProfile, ModelReference
 from aiimage.talent.service import authorization_is_current
 from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.queue import QueueHints
-from aiimage.workflow.schemas import BatchResponse
+from aiimage.workflow.schemas import BatchDetailResponse, BatchResponse
 from aiimage.workflow.state import BatchStatus
 
 
@@ -142,7 +142,7 @@ async def create_fashion_plan(
         mode=plan.mode,
         requested_outputs=plan.requested_outputs,
         created_at=plan.created_at,
-        batches=[BatchResponse.model_validate(batch) for batch in batches],
+        batches=[BatchDetailResponse.model_validate(batch) for batch in batches],
     )
 
 

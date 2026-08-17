@@ -31,4 +31,11 @@ button,a,input,select,textarea { transition:all .18s ease; }
 .plan-slot { min-height:112px; border:1px solid rgb(255 255 255/.08); border-radius:14px; background:rgb(9 11 18/.44); padding:15px; }
 .version-chip { display:inline-flex; align-items:center; border:1px solid rgb(255 255 255/.1); border-radius:999px; padding:5px 9px; color:#98a2b7; font-size:11px; white-space:nowrap; }
 .failure-pill { display:inline-flex; align-items:center; border:1px solid rgb(248 113 113/.25); border-radius:999px; background:rgb(248 113 113/.08); padding:5px 9px; color:#fca5a5; font-size:11px; }
+.output-option { display:flex; min-height:82px; cursor:pointer; align-items:flex-start; gap:12px; border:1px solid rgb(255 255 255/.09); border-radius:14px; background:rgb(9 11 18/.34); padding:15px; }
+.output-option:hover { border-color:rgb(255 116 72/.35); background:rgb(255 255 255/.025); }
+.output-option-selected { border-color:rgb(255 116 72/.55); background:rgb(255 116 72/.08); }
+.output-option input { margin-top:3px; accent-color:#ff7448; }
+.output-option strong { display:block; color:#e9edf5; font-size:14px; }
+.output-option small { display:block; margin-top:5px; color:#778199; font-size:11px; line-height:1.5; }
+.failure-note { border:1px solid rgb(248 113 113/.2); border-radius:12px; background:rgb(248 113 113/.06); padding:12px 14px; color:#fca5a5; font-size:12px; line-height:1.6; }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; } }
