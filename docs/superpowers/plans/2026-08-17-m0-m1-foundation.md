@@ -6,7 +6,7 @@
 
 **Architecture:** Use a pnpm monorepo with a Next.js web app and one Python package that serves both the FastAPI process and the background worker. PostgreSQL is authoritative for domain and job state, Redis only wakes workers, and MinIO provides an S3-compatible asset store. Provider code sits behind capability contracts so real APIs and ComfyUI can be added without changing workflow code.
 
-**Tech Stack:** Node.js 24, pnpm 11, Next.js 16, React 19, TypeScript 7, Python 3.13 managed by uv, FastAPI 0.128, Pydantic 2.13, SQLAlchemy 2.0, PostgreSQL 18, Redis 8, MinIO/S3, pytest 8, Vitest, Playwright, Docker Compose.
+**Tech Stack:** Node.js 24, pnpm 11, Next.js 16, React 19, TypeScript 5.9, Python 3.13 managed by uv, FastAPI 0.128, Pydantic 2.13, SQLAlchemy 2.0, PostgreSQL 17, Redis 8, MinIO/S3, pytest 8, Vitest, Playwright, Docker Compose.
 
 **Spec:** `docs/superpowers/specs/2026-08-17-ecommerce-ai-image-platform-design.md`
 
@@ -169,7 +169,7 @@ Create the web app with the exact versions resolved into `pnpm-lock.yaml`:
 ```bash
 pnpm dlx create-next-app@16.3.1 apps/web --ts --tailwind --eslint --app --src-dir --use-pnpm --import-alias '@/*' --yes
 pnpm --dir apps/web add react@19.2.8 react-dom@19.2.8 zod@4 @tanstack/react-query@5
-pnpm --dir apps/web add -D typescript@7.0.2 vitest @testing-library/react @testing-library/jest-dom @playwright/test@1.62.1
+pnpm --dir apps/web add -D typescript@5.9.3 vitest @testing-library/react @testing-library/jest-dom @playwright/test@1.62.1
 uv python pin 3.13
 uv sync --project backend --dev
 ```
@@ -198,7 +198,7 @@ AIIMAGE_BOOTSTRAP_ADMIN_PASSWORD=LocalOnly-ChangeMe-2026
 ```yaml
 services:
   postgres:
-    image: postgres:18-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: aiimage
       POSTGRES_USER: aiimage
