@@ -61,6 +61,7 @@ async def authenticated_app(session_factory):
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_store] = InMemoryObjectStore
     return app
 
 
@@ -82,6 +83,7 @@ async def operator_client(session_factory) -> AsyncIterator[AsyncClient]:
 
     app = create_app()
     app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_store] = InMemoryObjectStore
     transport = ASGITransport(app=app)
     async with AsyncClient(
         transport=transport,

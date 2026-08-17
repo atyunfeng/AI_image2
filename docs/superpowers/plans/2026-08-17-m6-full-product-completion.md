@@ -94,10 +94,10 @@
 - `POST /template-packs/{id}/versions` creates a draft copied from a selected immutable version or supplied JSON rules.
 - `POST /template-pack-versions/{id}/publish` publishes one draft, preserving all historical versions.
 
-- [ ] Test role protection, unique slugs, immutable published rules and monotonically increasing versions.
-- [ ] Implement draft/published lifecycle without modifying existing preset versions.
-- [ ] Build the template center with kind filters, JSON validation, version history and composition preview links.
-- [ ] Run template tests and commit as `feat: add template version management`.
+- [x] Test role protection, unique slugs, immutable published rules and monotonically increasing versions.
+- [x] Implement draft/published lifecycle without modifying existing preset versions.
+- [x] Build the template center with kind filters, JSON validation, version history and composition preview links.
+- [x] Run template tests and commit as `feat: add template version management`.
 
 ### Task 4: Per-image production controls, retry and parameter copy
 

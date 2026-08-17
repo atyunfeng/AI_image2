@@ -17,7 +17,36 @@ class TemplatePackResponse(BaseModel):
     status: PackStatus
     rules: dict[str, Any]
     source: str
-    published_at: datetime
+    published_at: datetime | None
+
+
+class TemplatePackVersionResponse(BaseModel):
+    id: UUID
+    version: int
+    status: PackStatus
+    rules: dict[str, Any]
+    source: str
+    published_at: datetime | None
+
+
+class ManagedTemplatePackResponse(BaseModel):
+    id: UUID
+    slug: str
+    name: str
+    kind: PackKind
+    versions: list[TemplatePackVersionResponse]
+
+
+class TemplatePackCreate(BaseModel):
+    slug: str = Field(min_length=2, max_length=100, pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+    name: str = Field(min_length=1, max_length=255)
+    kind: PackKind
+    rules: dict[str, Any]
+
+
+class TemplatePackVersionCreate(BaseModel):
+    source_version_id: UUID | None = None
+    rules: dict[str, Any] | None = None
 
 
 class CompilePlanRequest(BaseModel):

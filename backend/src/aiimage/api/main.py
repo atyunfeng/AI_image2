@@ -16,6 +16,7 @@ from aiimage.review.router import router as review_router
 from aiimage.talent.router import router as talent_router
 from aiimage.templates.router import plan_router
 from aiimage.templates.router import router as template_router
+from aiimage.templates.router import version_router as template_version_router
 from aiimage.workflow.router import router as workflow_router
 
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
     app.include_router(editing_router, prefix="/api/v1")
     app.include_router(model_router, prefix="/api/v1")
     app.include_router(template_router, prefix="/api/v1")
+    app.include_router(template_version_router, prefix="/api/v1")
     app.include_router(plan_router, prefix="/api/v1")
     app.include_router(talent_router, prefix="/api/v1")
     app.include_router(fashion_router, prefix="/api/v1")
