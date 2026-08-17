@@ -23,6 +23,7 @@ async def run_worker() -> None:
         provider_registry=ProviderRegistry(secret_key_base64=settings.secret_key_base64),
     )
     try:
+        await recover_generation_steps(database.session_factory, queue)
         while True:
             item = await redis.brpop(queue.queue_name, timeout=30)
             if item is not None:

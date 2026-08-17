@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore
+from aiimage.auth.models import User  # noqa: F401 - registers worker foreign-key metadata
 from aiimage.catalog.models import ProductReference
 from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
 from aiimage.models.models import ModelConfiguration
