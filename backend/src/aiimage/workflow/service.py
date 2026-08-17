@@ -38,11 +38,14 @@ async def create_batch(
             )
         ).all()
     )
-    if payload.mode == "strict" and payload.requested_view.value in {"side", "back"}:
-        if payload.requested_view.value not in {reference.view for reference in references}:
-            raise BatchValidationError(
-                f"Strict mode requires a {payload.requested_view.value} reference"
-            )
+    if (
+        payload.mode == "strict"
+        and payload.requested_view.value in {"side", "back"}
+        and payload.requested_view.value not in {reference.view for reference in references}
+    ):
+        raise BatchValidationError(
+            f"Strict mode requires a {payload.requested_view.value} reference"
+        )
     anchor = await session.scalar(
         select(TruthAnchor)
         .where(TruthAnchor.product_id == product.id)
@@ -79,4 +82,3 @@ async def create_batch(
     await session.commit()
     await queue.publish(step.id)
     return batch
-
