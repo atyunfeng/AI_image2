@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
@@ -18,6 +19,7 @@ from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.state import BatchStatus, StepStatus
 
 LEASE_DURATION = timedelta(minutes=5)
+logger = logging.getLogger(__name__)
 TERMINAL_STEP_STATUSES = {
     StepStatus.SUCCEEDED.value,
     StepStatus.FAILED.value,
@@ -179,6 +181,7 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         await _mark_failed(step_id, str(exc), context)
         return False
     except Exception:  # noqa: BLE001 - provider adapters are an external failure boundary
+        logger.exception("Provider execution failed for generation step %s", step_id)
         await _mark_failed(step_id, "provider_error", context)
         return False
 
