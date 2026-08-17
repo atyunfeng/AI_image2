@@ -120,10 +120,10 @@
 - Each item can override model, dimensions, prompt, authoritative copy, reference IDs and provider parameters.
 - `POST /batches/{id}/retry` creates a new traceable batch with the same inputs; `POST /batches/{id}/duplicate` accepts safe prompt/size/model overrides and records `source_batch_id`.
 
-- [ ] Add tests for unexecuted-only mutation, per-item model selection, strict references and retry provenance.
-- [ ] Implement item CRUD and batch cloning with new idempotency keys and audit records.
-- [ ] Add inline plan editing, add/remove controls, retry and copy-parameters actions.
-- [ ] Run workflow/template tests and commit as `feat: add per-image production controls`.
+- [x] Add tests for unexecuted-only mutation, per-item model selection, strict references and retry provenance.
+- [x] Implement item CRUD and batch cloning with new idempotency keys and audit records.
+- [x] Add inline plan editing, add/remove controls, retry and copy-parameters actions.
+- [x] Run workflow/template tests and commit as `feat: add per-image production controls`.
 
 ### Task 5: Automatic selection and full deterministic layer manager
 

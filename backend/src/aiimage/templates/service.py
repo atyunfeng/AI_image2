@@ -20,13 +20,16 @@ from aiimage.templates.presets import first_party_packs
 from aiimage.templates.schemas import (
     CompilePlanRequest,
     ManagedTemplatePackResponse,
+    ProductionPlanItemCreate,
     ProductionPlanItemResponse,
+    ProductionPlanItemUpdate,
     ProductionPlanResponse,
     TemplatePackCreate,
     TemplatePackResponse,
     TemplatePackVersionCreate,
     TemplatePackVersionResponse,
 )
+from aiimage.workflow.models import GenerationBatch
 
 
 class DuplicatePackSlugError(RuntimeError):
@@ -34,6 +37,10 @@ class DuplicatePackSlugError(RuntimeError):
 
 
 class PackManagementError(RuntimeError):
+    pass
+
+
+class PlanMutationError(RuntimeError):
     pass
 
 
@@ -256,6 +263,9 @@ def to_plan_response(
                 prompt=item.prompt,
                 authoritative_copy=item.authoritative_copy,
                 rules=item.rules,
+                model_configuration_id=item.model_configuration_id,
+                reference_ids=[UUID(value) for value in item.reference_ids],
+                provider_parameters=item.provider_parameters,
             )
             for item in sorted(items, key=lambda value: value.position)
         ],
@@ -329,6 +339,122 @@ async def create_production_plan(
     session.add_all(items)
     await session.commit()
     return to_plan_response(plan, items)
+
+
+async def _assert_plan_mutable(session: AsyncSession, plan_id: UUID) -> ProductionPlan:
+    plan = await session.get(ProductionPlan, plan_id)
+    if plan is None:
+        raise LookupError(plan_id)
+    executed = await session.scalar(
+        select(GenerationBatch.id).where(GenerationBatch.production_plan_id == plan_id).limit(1)
+    )
+    if executed is not None:
+        raise PlanMutationError("Executed production plans are immutable")
+    return plan
+
+
+async def _validate_item_references(
+    session: AsyncSession, product_id: UUID, reference_ids: list[UUID]
+) -> None:
+    if not reference_ids:
+        return
+    valid = set(
+        (
+            await session.scalars(
+                select(ProductReference.id).where(
+                    ProductReference.product_id == product_id,
+                    ProductReference.id.in_(reference_ids),
+                )
+            )
+        ).all()
+    )
+    if valid != set(reference_ids):
+        raise PlanMutationError("Every reference_id must belong to the plan product")
+
+
+async def add_plan_item(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    payload: ProductionPlanItemCreate,
+    user_id: UUID,
+) -> ProductionPlanItemResponse:
+    plan = await _assert_plan_mutable(session, plan_id)
+    await _validate_item_references(session, plan.product_id, payload.reference_ids)
+    latest = await session.scalar(
+        select(func.max(ProductionPlanItem.position)).where(ProductionPlanItem.plan_id == plan_id)
+    )
+    item = ProductionPlanItem(
+        plan_id=plan_id,
+        position=(latest or 0) + 1,
+        slot=payload.slot,
+        label=payload.label,
+        requested_view=payload.requested_view,
+        width=payload.width,
+        height=payload.height,
+        prompt=payload.prompt,
+        authoritative_copy=payload.authoritative_copy,
+        rules=payload.rules,
+        model_configuration_id=payload.model_configuration_id,
+        reference_ids=[str(value) for value in payload.reference_ids],
+        provider_parameters=payload.provider_parameters,
+    )
+    session.add(item)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_created",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "slot": item.slot},
+    )
+    await session.commit()
+    await session.refresh(item)
+    return to_plan_response(plan, [item]).items[0]
+
+
+async def update_plan_item(
+    session: AsyncSession,
+    *,
+    plan_id: UUID,
+    item_id: UUID,
+    payload: ProductionPlanItemUpdate,
+    user_id: UUID,
+) -> ProductionPlanItemResponse:
+    plan = await _assert_plan_mutable(session, plan_id)
+    item = await session.get(ProductionPlanItem, item_id)
+    if item is None or item.plan_id != plan_id:
+        raise LookupError(item_id)
+    values = payload.model_dump(exclude_unset=True)
+    if "reference_ids" in values:
+        references = values["reference_ids"] or []
+        await _validate_item_references(session, plan.product_id, references)
+        values["reference_ids"] = [str(value) for value in references]
+    for key, value in values.items():
+        setattr(item, key, value)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_updated",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "item_id": str(item_id), "fields": sorted(values)},
+    )
+    await session.commit()
+    return to_plan_response(plan, [item]).items[0]
+
+
+async def delete_plan_item(
+    session: AsyncSession, *, plan_id: UUID, item_id: UUID, user_id: UUID
+) -> None:
+    await _assert_plan_mutable(session, plan_id)
+    item = await session.get(ProductionPlanItem, item_id)
+    if item is None or item.plan_id != plan_id:
+        raise LookupError(item_id)
+    await session.delete(item)
+    await record_audit_event(
+        session,
+        event_type="production_plan.item_deleted",
+        actor_user_id=user_id,
+        details={"plan_id": str(plan_id), "item_id": str(item_id)},
+    )
+    await session.commit()
 
 
 async def get_production_plan(

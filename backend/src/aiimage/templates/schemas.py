@@ -68,6 +68,36 @@ class ProductionPlanItemResponse(BaseModel):
     prompt: str
     authoritative_copy: str | None
     rules: dict[str, Any]
+    model_configuration_id: UUID | None = None
+    reference_ids: list[UUID] = []
+    provider_parameters: dict[str, Any] = {}
+
+
+class ProductionPlanItemCreate(BaseModel):
+    slot: str = Field(min_length=1, max_length=100)
+    label: str = Field(min_length=1, max_length=255)
+    requested_view: str = Field(min_length=1, max_length=50)
+    width: int = Field(ge=64, le=4096)
+    height: int = Field(ge=64, le=4096)
+    prompt: str = Field(min_length=1, max_length=4000)
+    authoritative_copy: str | None = None
+    rules: dict[str, Any] = {}
+    model_configuration_id: UUID | None = None
+    reference_ids: list[UUID] = []
+    provider_parameters: dict[str, Any] = {}
+
+
+class ProductionPlanItemUpdate(BaseModel):
+    label: str | None = Field(default=None, min_length=1, max_length=255)
+    requested_view: str | None = Field(default=None, min_length=1, max_length=50)
+    width: int | None = Field(default=None, ge=64, le=4096)
+    height: int | None = Field(default=None, ge=64, le=4096)
+    prompt: str | None = Field(default=None, min_length=1, max_length=4000)
+    authoritative_copy: str | None = None
+    rules: dict[str, Any] | None = None
+    model_configuration_id: UUID | None = None
+    reference_ids: list[UUID] | None = None
+    provider_parameters: dict[str, Any] | None = None
 
 
 class ProductionPlanResponse(BaseModel):

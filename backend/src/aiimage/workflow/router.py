@@ -13,9 +13,10 @@ from aiimage.workflow.queue import QueueHints, get_queue_hints
 from aiimage.workflow.schemas import (
     BatchDetailResponse,
     BatchResponse,
+    CloneBatchRequest,
     CreateBatchRequest,
 )
-from aiimage.workflow.service import BatchValidationError, create_batch
+from aiimage.workflow.service import BatchValidationError, clone_batch, create_batch
 
 router = APIRouter(prefix="/batches", tags=["batches"])
 BatchUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR))]
@@ -29,6 +30,7 @@ def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDeta
         fashion_plan_id=batch.fashion_plan_id,
         model_profile_id=batch.model_profile_id,
         edit_revision_id=batch.edit_revision_id,
+        source_batch_id=batch.source_batch_id,
         product_id=batch.product_id,
         model_configuration_id=batch.model_configuration_id,
         requested_view=batch.requested_view,
@@ -100,4 +102,41 @@ async def create_batch_endpoint(
         batch = await create_batch(session, queue, payload=payload, user_id=user.id)
     except BatchValidationError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    return BatchResponse.model_validate(batch)
+
+
+@router.post("/{batch_id}/retry", response_model=BatchResponse, status_code=201)
+async def retry_batch_endpoint(
+    batch_id: UUID,
+    user: BatchUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    queue: Annotated[QueueHints, Depends(get_queue_hints)],
+) -> BatchResponse:
+    try:
+        batch = await clone_batch(
+            session, queue, batch_id=batch_id, payload=CloneBatchRequest(), user_id=user.id, retry=True
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Batch not found") from exc
+    except BatchValidationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return BatchResponse.model_validate(batch)
+
+
+@router.post("/{batch_id}/duplicate", response_model=BatchResponse, status_code=201)
+async def duplicate_batch_endpoint(
+    batch_id: UUID,
+    payload: CloneBatchRequest,
+    user: BatchUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    queue: Annotated[QueueHints, Depends(get_queue_hints)],
+) -> BatchResponse:
+    try:
+        batch = await clone_batch(
+            session, queue, batch_id=batch_id, payload=payload, user_id=user.id, retry=False
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Batch not found") from exc
+    except BatchValidationError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     return BatchResponse.model_validate(batch)

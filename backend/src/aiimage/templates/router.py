@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.api.dependencies import get_session
@@ -11,6 +11,9 @@ from aiimage.templates.compiler import PlanCompilationError
 from aiimage.templates.schemas import (
     CompilePlanRequest,
     ManagedTemplatePackResponse,
+    ProductionPlanItemCreate,
+    ProductionPlanItemResponse,
+    ProductionPlanItemUpdate,
     ProductionPlanResponse,
     TemplatePackCreate,
     TemplatePackResponse,
@@ -20,13 +23,17 @@ from aiimage.templates.schemas import (
 from aiimage.templates.service import (
     DuplicatePackSlugError,
     PackManagementError,
+    PlanMutationError,
+    add_plan_item,
     create_pack_version,
     create_production_plan,
     create_template_pack,
+    delete_plan_item,
     get_production_plan,
     list_managed_packs,
     list_published_packs,
     publish_pack_version,
+    update_plan_item,
 )
 from aiimage.workflow.queue import QueueHints, get_queue_hints
 from aiimage.workflow.schemas import BatchResponse, ExecuteProductionPlanRequest
@@ -133,6 +140,59 @@ async def read_production_plan(
     if plan is None:
         raise HTTPException(status_code=404, detail="Production plan not found")
     return plan
+
+
+@plan_router.post(
+    "/{plan_id}/items", response_model=ProductionPlanItemResponse, status_code=201
+)
+async def create_production_plan_item(
+    plan_id: UUID,
+    payload: ProductionPlanItemCreate,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProductionPlanItemResponse:
+    try:
+        return await add_plan_item(session, plan_id=plan_id, payload=payload, user_id=user.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@plan_router.patch(
+    "/{plan_id}/items/{item_id}", response_model=ProductionPlanItemResponse
+)
+async def patch_production_plan_item(
+    plan_id: UUID,
+    item_id: UUID,
+    payload: ProductionPlanItemUpdate,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> ProductionPlanItemResponse:
+    try:
+        return await update_plan_item(
+            session, plan_id=plan_id, item_id=item_id, payload=payload, user_id=user.id
+        )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan item not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+
+@plan_router.delete("/{plan_id}/items/{item_id}", status_code=204)
+async def remove_production_plan_item(
+    plan_id: UUID,
+    item_id: UUID,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> Response:
+    try:
+        await delete_plan_item(session, plan_id=plan_id, item_id=item_id, user_id=user.id)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail="Production plan item not found") from exc
+    except PlanMutationError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return Response(status_code=204)
 
 
 @plan_router.post(

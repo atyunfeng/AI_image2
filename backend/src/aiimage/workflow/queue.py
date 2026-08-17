@@ -1,6 +1,7 @@
 from uuid import UUID
 
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
 
 from aiimage.config import get_settings
 
@@ -13,7 +14,7 @@ class QueueHints:
         try:
             await client.lpush(self.queue_name, str(step_id))
             return True
-        except ConnectionError:
+        except RedisConnectionError:
             return False
         finally:
             await client.aclose()
@@ -21,4 +22,3 @@ class QueueHints:
 
 def get_queue_hints() -> QueueHints:
     return QueueHints()
-

@@ -26,6 +26,7 @@ class BatchResponse(BaseModel):
     fashion_plan_id: UUID | None = None
     model_profile_id: UUID | None = None
     edit_revision_id: UUID | None = None
+    source_batch_id: UUID | None = None
     product_id: UUID
     model_configuration_id: UUID
     requested_view: ReferenceView | Literal["edit"]
@@ -46,3 +47,10 @@ class BatchDetailResponse(BatchResponse):
 
 class ExecuteProductionPlanRequest(BaseModel):
     model_configuration_id: UUID
+
+
+class CloneBatchRequest(BaseModel):
+    model_configuration_id: UUID | None = None
+    prompt: str | None = Field(default=None, min_length=1, max_length=4000)
+    width: int | None = Field(default=None, ge=64, le=4096)
+    height: int | None = Field(default=None, ge=64, le=4096)

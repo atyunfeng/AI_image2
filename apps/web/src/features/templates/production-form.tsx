@@ -107,7 +107,7 @@ export function ProductionForm({ products, models, packs }: Props) {
         </button>
       </form>
 
-      {plan && <PlanPreview plan={plan} />}
+      {plan && <PlanPreview plan={plan} models={eligibleModels} onChange={setPlan} />}
       {plan && (
         <div className="mt-5 grid gap-4 md:grid-cols-[1fr_auto]">
           <div>
