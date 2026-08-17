@@ -1,0 +1,1 @@
+"""Durable generation worker."""
