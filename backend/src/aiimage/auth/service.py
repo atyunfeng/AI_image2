@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiimage.audit.service import record_audit_event
 from aiimage.auth.models import Role, User
 
-
 _password_hasher = PasswordHasher()
 
 

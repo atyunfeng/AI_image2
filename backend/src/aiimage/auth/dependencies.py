@@ -11,7 +11,6 @@ from aiimage.auth.models import Role, User
 from aiimage.auth.service import decode_access_token
 from aiimage.config import Settings, get_settings
 
-
 bearer_scheme = HTTPBearer(auto_error=False)
 
 

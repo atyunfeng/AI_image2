@@ -6,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiimage.api.dependencies import get_session
 from aiimage.audit.service import record_audit_event
 from aiimage.auth.dependencies import AdminUser, CurrentUser
+from aiimage.auth.models import User
 from aiimage.auth.schemas import LoginRequest, TokenResponse, UserResponse
 from aiimage.auth.service import authenticate_user, create_access_token
 from aiimage.config import Settings, get_settings
-
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -51,4 +51,3 @@ async def me(user: CurrentUser) -> User:
 @router.get("/admin-check", response_model=UserResponse)
 async def admin_check(user: AdminUser) -> User:
     return user
-
