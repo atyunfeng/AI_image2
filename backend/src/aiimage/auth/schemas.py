@@ -1,12 +1,12 @@
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict, Field
 
 from aiimage.auth.models import Role
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str = Field(min_length=3, max_length=320)
     password: str
 
 
@@ -19,6 +19,5 @@ class UserResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
-    email: EmailStr
+    email: str
     roles: list[Role]
-
