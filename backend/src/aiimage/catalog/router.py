@@ -6,10 +6,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.api.dependencies import get_session
+from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore, get_object_store
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
-from aiimage.assets.models import Asset
 from aiimage.catalog.models import Product, ProductReference, ReferenceView
 from aiimage.catalog.schemas import (
     ProductCreate,

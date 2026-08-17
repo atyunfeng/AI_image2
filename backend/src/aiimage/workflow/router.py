@@ -7,8 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from aiimage.api.dependencies import get_session
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
-from aiimage.workflow.queue import QueueHints, get_queue_hints
 from aiimage.workflow.models import GenerationBatch, GenerationStep
+from aiimage.workflow.queue import QueueHints, get_queue_hints
 from aiimage.workflow.schemas import BatchDetailResponse, BatchResponse, CreateBatchRequest
 from aiimage.workflow.service import BatchValidationError, create_batch
 
