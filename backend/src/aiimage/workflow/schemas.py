@@ -22,6 +22,7 @@ class BatchResponse(BaseModel):
 
     id: UUID
     product_id: UUID
+    model_configuration_id: UUID
     requested_view: ReferenceView
     mode: str
     status: BatchStatus
@@ -29,3 +30,9 @@ class BatchResponse(BaseModel):
     width: int
     height: int
 
+
+class BatchDetailResponse(BatchResponse):
+    output_asset_id: UUID | None = None
+    provider_request_id: str | None = None
+    estimated_cost_minor: int = 0
+    error_classification: str | None = None

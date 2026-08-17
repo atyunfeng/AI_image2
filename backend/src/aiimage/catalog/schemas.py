@@ -28,3 +28,6 @@ class ProductReferenceResponse(BaseModel):
     mime_type: str
     size_bytes: int
 
+
+class ProductDetailResponse(ProductResponse):
+    references: list[ProductReferenceResponse]
