@@ -26,10 +26,12 @@ docker compose up -d --build --wait
 ```
 
 - 中台：http://localhost:3000
+- 中台管理员：`admin@aiimage.local`
+- 中台密码：`LocalOnly-ChangeMe-2026`
 - API 文档：http://localhost:8000/docs
 - MinIO 控制台：http://localhost:9001
-- 演示管理员：`admin@aiimage.local`
-- 本地密码：`LocalOnly-ChangeMe-2026`
+- MinIO 根账号：`aiimage`
+- MinIO 根密码：`local-development-secret`
 
 以上密钥只用于本地开发，部署前必须全部替换。
 
