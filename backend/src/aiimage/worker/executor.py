@@ -13,6 +13,7 @@ from aiimage.assets.models import Asset
 from aiimage.assets.storage import ObjectStore
 from aiimage.auth.models import User  # noqa: F401 - registers worker foreign-key metadata
 from aiimage.catalog.models import ProductReference
+from aiimage.composition.service import create_composed_asset
 from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
 from aiimage.models.models import ModelConfiguration
 from aiimage.providers.registry import ProviderRegistry
@@ -200,9 +201,19 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
             )
             session.add(asset)
             await session.flush()
+        output_asset = asset
+        slot_rules = batch.input_snapshot.get("slot_rules")
+        if slot_rules:
+            output_asset = await create_composed_asset(
+                session,
+                context.object_store,
+                parent=asset,
+                rules=slot_rules,
+                authoritative_copy=batch.input_snapshot.get("authoritative_copy"),
+            )
         current.status = StepStatus.SUCCEEDED.value
         current.provider_request_id = result.provider_request_id
-        current.output_asset_id = asset.id
+        current.output_asset_id = output_asset.id
         current.estimated_cost_minor = result.estimated_cost_minor
         current.lease_owner = None
         current.lease_expires_at = None

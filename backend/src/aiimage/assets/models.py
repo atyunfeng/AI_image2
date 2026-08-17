@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import JSON, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from aiimage.db import Base
@@ -23,6 +24,8 @@ class Asset(Base):
         ForeignKey("assets.id", ondelete="RESTRICT"),
         nullable=True,
     )
+    derivation_operation: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    derivation_parameters: Mapped[dict[str, Any] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -30,4 +33,3 @@ class Asset(Base):
 
     def replace_content(self, content: bytes) -> None:
         raise ImmutableAssetError("Asset content is immutable; create a derived asset instead")
-

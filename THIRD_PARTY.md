@@ -11,5 +11,11 @@ Architectural references only (no copied code):
 The current implementation is original project code built on FastAPI, SQLAlchemy, Next.js,
 React, Redis, PostgreSQL, MinIO/S3 and Pillow through their public package APIs.
 
+Runtime font dependency:
+
+- Noto Sans CJK, Debian package `fonts-noto-cjk`, SIL Open Font License 1.1: deterministic
+  Chinese/Japanese/Korean text layers in containerized image composition. The package is
+  installed from Debian Bookworm repositories; no font binary is committed to this repository.
+
 Before copying or modifying upstream source, record the repository URL, fixed commit, license,
 copied paths, local destination, and modification summary here.
