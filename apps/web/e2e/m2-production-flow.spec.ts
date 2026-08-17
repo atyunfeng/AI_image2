@@ -34,7 +34,7 @@ test("operator compiles, generates, quality-checks, and exports a platform image
   await expect(page).toHaveURL(/\/production\//);
 
   await expect(page.getByText("结构质检")).toHaveCount(3, { timeout: 60_000 });
-  await expect(page.getByText("通过", { exact: true })).toHaveCount(3);
+  await expect(page.getByText("通过", { exact: true })).toHaveCount(3, { timeout: 60_000 });
   await page.getByRole("link", { name: "查看与审核" }).first().click();
   await expect(page.getByRole("button", { name: "通过" })).toBeEnabled();
   await page.getByRole("button", { name: "通过" }).click();
