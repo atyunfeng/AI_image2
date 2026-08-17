@@ -16,6 +16,7 @@ from aiimage.auth.service import create_access_token, create_user
 from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
 from aiimage.config import get_settings
 from aiimage.db import Base
+from aiimage.models.models import ModelConfiguration  # noqa: F401
 
 
 @pytest_asyncio.fixture
