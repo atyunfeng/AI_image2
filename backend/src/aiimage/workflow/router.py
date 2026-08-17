@@ -28,6 +28,7 @@ def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDeta
         production_plan_item_id=batch.production_plan_item_id,
         fashion_plan_id=batch.fashion_plan_id,
         model_profile_id=batch.model_profile_id,
+        edit_revision_id=batch.edit_revision_id,
         product_id=batch.product_id,
         model_configuration_id=batch.model_configuration_id,
         requested_view=batch.requested_view,

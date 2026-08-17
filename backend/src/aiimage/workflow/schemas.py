@@ -25,6 +25,7 @@ class BatchResponse(BaseModel):
     production_plan_item_id: UUID | None = None
     fashion_plan_id: UUID | None = None
     model_profile_id: UUID | None = None
+    edit_revision_id: UUID | None = None
     product_id: UUID
     model_configuration_id: UUID
     requested_view: ReferenceView

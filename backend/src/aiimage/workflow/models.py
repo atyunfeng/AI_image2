@@ -25,6 +25,9 @@ class GenerationBatch(Base):
     model_profile_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("model_profiles.id"), nullable=True, index=True
     )
+    edit_revision_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("edit_revisions.id"), nullable=True, unique=True
+    )
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"))
     model_configuration_id: Mapped[UUID] = mapped_column(ForeignKey("model_configurations.id"))
     requested_view: Mapped[str] = mapped_column(String(30))

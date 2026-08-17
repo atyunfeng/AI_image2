@@ -4,6 +4,7 @@ from fastapi import APIRouter, FastAPI
 from aiimage.assets.router import router as asset_router
 from aiimage.auth.router import router as auth_router
 from aiimage.catalog.router import router as catalog_router
+from aiimage.editing.router import router as editing_router
 from aiimage.export.router import router as export_router
 from aiimage.fashion.router import router as fashion_router
 from aiimage.models.router import router as model_router
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(asset_router, prefix="/api/v1")
     app.include_router(catalog_router, prefix="/api/v1")
+    app.include_router(editing_router, prefix="/api/v1")
     app.include_router(model_router, prefix="/api/v1")
     app.include_router(template_router, prefix="/api/v1")
     app.include_router(plan_router, prefix="/api/v1")
