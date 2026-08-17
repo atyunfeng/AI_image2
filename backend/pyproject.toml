@@ -16,8 +16,8 @@ dependencies = [
   "pyjwt>=2.10,<3",
   "python-multipart>=0.0.20,<1",
   "redis>=6,<7",
-  "sqlalchemy[asyncio]==2.0.52"
-  ,"uvicorn[standard]>=0.35,<1"
+  "sqlalchemy[asyncio]==2.0.52",
+  "uvicorn[standard]>=0.35,<1"
 ]
 
 [dependency-groups]
