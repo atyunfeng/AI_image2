@@ -10,7 +10,11 @@ from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
 from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.queue import QueueHints, get_queue_hints
-from aiimage.workflow.schemas import BatchDetailResponse, BatchResponse, CreateBatchRequest
+from aiimage.workflow.schemas import (
+    BatchDetailResponse,
+    BatchResponse,
+    CreateBatchRequest,
+)
 from aiimage.workflow.service import BatchValidationError, create_batch
 
 router = APIRouter(prefix="/batches", tags=["batches"])
@@ -20,6 +24,8 @@ BatchUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR))]
 def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDetailResponse:
     return BatchDetailResponse(
         id=batch.id,
+        production_plan_id=batch.production_plan_id,
+        production_plan_item_id=batch.production_plan_item_id,
         product_id=batch.product_id,
         model_configuration_id=batch.model_configuration_id,
         requested_view=batch.requested_view,
@@ -91,3 +97,4 @@ async def create_batch_endpoint(
     except BatchValidationError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     return BatchResponse.model_validate(batch)
+

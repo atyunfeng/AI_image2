@@ -18,6 +18,9 @@ from aiimage.templates.service import (
     get_production_plan,
     list_published_packs,
 )
+from aiimage.workflow.queue import QueueHints, get_queue_hints
+from aiimage.workflow.schemas import BatchResponse, ExecuteProductionPlanRequest
+from aiimage.workflow.service import BatchValidationError, execute_production_plan
 
 router = APIRouter(prefix="/template-packs", tags=["template-packs"])
 TemplateUser = Annotated[
@@ -62,3 +65,30 @@ async def read_production_plan(
     if plan is None:
         raise HTTPException(status_code=404, detail="Production plan not found")
     return plan
+
+
+@plan_router.post(
+    "/{plan_id}/execute",
+    response_model=list[BatchResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def execute_plan_endpoint(
+    plan_id: UUID,
+    payload: ExecuteProductionPlanRequest,
+    user: TemplateUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    queue: Annotated[QueueHints, Depends(get_queue_hints)],
+) -> list[BatchResponse]:
+    try:
+        batches = await execute_production_plan(
+            session,
+            queue,
+            plan_id=plan_id,
+            model_configuration_id=payload.model_configuration_id,
+            user_id=user.id,
+        )
+    except BatchValidationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)
+        ) from error
+    return [BatchResponse.model_validate(batch) for batch in batches]

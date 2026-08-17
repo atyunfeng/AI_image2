@@ -21,6 +21,8 @@ class BatchResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    production_plan_id: UUID | None = None
+    production_plan_item_id: UUID | None = None
     product_id: UUID
     model_configuration_id: UUID
     requested_view: ReferenceView
@@ -36,3 +38,7 @@ class BatchDetailResponse(BatchResponse):
     provider_request_id: str | None = None
     estimated_cost_minor: int = 0
     error_classification: str | None = None
+
+
+class ExecuteProductionPlanRequest(BaseModel):
+    model_configuration_id: UUID
