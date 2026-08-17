@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,9 +22,10 @@ class Settings(BaseSettings):
     jwt_secret: str
     bootstrap_admin_email: str
     bootstrap_admin_password: str
+    worker_max_concurrency: int = Field(default=4, ge=1, le=128)
+    provider_concurrency_limits: dict[str, int] = Field(default_factory=dict)
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-

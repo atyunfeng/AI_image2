@@ -1,12 +1,12 @@
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from io import BytesIO
 from uuid import UUID
 
 from PIL import Image, UnidentifiedImageError
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aiimage.assets.models import Asset
@@ -48,6 +48,8 @@ class WorkerContext:
     session_factory: async_sessionmaker[AsyncSession]
     object_store: ObjectStore
     provider_registry: ProviderRegistry
+    max_concurrency: int = 4
+    provider_concurrency_limits: dict[str, int] = field(default_factory=dict)
 
 
 class StructuralQAError(RuntimeError):
@@ -108,6 +110,33 @@ async def _lease_step(
             batch.status = BatchStatus.FAILED.value
             await session.commit()
             return None
+        running_statement = (
+            select(func.count(GenerationStep.id))
+            .where(
+                GenerationStep.status == StepStatus.RUNNING.value,
+                GenerationStep.lease_expires_at > now,
+            )
+        )
+        running_total = int((await session.scalar(running_statement)) or 0)
+        if running_total >= context.max_concurrency:
+            return None
+        provider_limit = context.provider_concurrency_limits.get(configuration.provider)
+        if provider_limit is not None:
+            running_for_provider = int(
+                (
+                    await session.scalar(
+                        running_statement.join(
+                            GenerationBatch, GenerationBatch.id == GenerationStep.batch_id
+                        ).join(
+                            ModelConfiguration,
+                            ModelConfiguration.id == GenerationBatch.model_configuration_id,
+                        ).where(ModelConfiguration.provider == configuration.provider)
+                    )
+                )
+                or 0
+            )
+            if running_for_provider >= provider_limit:
+                return None
         step.status = StepStatus.RUNNING.value
         step.lease_owner = worker_id
         step.lease_expires_at = now + LEASE_DURATION

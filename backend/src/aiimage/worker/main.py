@@ -21,6 +21,8 @@ async def run_worker() -> None:
         session_factory=database.session_factory,
         object_store=get_object_store(),
         provider_registry=ProviderRegistry(secret_key_base64=settings.secret_key_base64),
+        max_concurrency=settings.worker_max_concurrency,
+        provider_concurrency_limits=settings.provider_concurrency_limits,
     )
     try:
         await recover_generation_steps(database.session_factory, queue)

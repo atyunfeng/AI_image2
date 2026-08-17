@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -8,10 +8,11 @@ from aiimage.models.domain import Capability
 
 class ModelCreate(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    provider: Literal["mock", "generic_http"]
+    provider: Literal["mock", "generic_http", "comfyui"]
     model_id: str = Field(min_length=1, max_length=200)
     base_url: str | None = None
     billing_currency: str = Field(default="USD", pattern="^[A-Z]{3}$")
+    provider_options: dict[str, Any] = Field(default_factory=dict)
     api_key: str | None = None
     capabilities: set[Capability]
 
@@ -30,6 +31,7 @@ class ModelResponse(BaseModel):
     model_id: str
     base_url: str | None
     billing_currency: str
+    provider_options: dict[str, Any]
     capabilities: list[Capability]
     has_key: bool
     key_suffix: str | None

@@ -1,4 +1,5 @@
 from datetime import datetime
+from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, LargeBinary, String, func
@@ -16,6 +17,7 @@ class ModelConfiguration(Base):
     model_id: Mapped[str] = mapped_column(String(200))
     base_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     billing_currency: Mapped[str] = mapped_column(String(3), default="USD")
+    provider_options: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     capabilities: Mapped[list[str]] = mapped_column(JSON, default=list)
     encrypted_api_key: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     api_key_nonce: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)

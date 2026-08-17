@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
@@ -118,3 +119,59 @@ async def test_duplicate_delivery_is_noop(session_factory, png_bytes) -> None:
 
     assert not await execute_step(step_id, worker_id="test-worker", context=context)
     assert len(store.objects) == object_count
+
+
+@pytest.mark.asyncio
+async def test_worker_respects_shared_global_and_provider_limits(session_factory, png_bytes) -> None:
+    running_step_id, batch_id, store = await _queued_step(session_factory, png_bytes)
+    async with session_factory() as session:
+        running = await session.get(GenerationStep, running_step_id)
+        source_batch = await session.get(GenerationBatch, batch_id)
+        running.status = StepStatus.RUNNING.value
+        running.lease_owner = "another-worker"
+        running.lease_expires_at = datetime.now(UTC) + timedelta(minutes=2)
+        queued_batch = GenerationBatch(
+            product_id=source_batch.product_id,
+            model_configuration_id=source_batch.model_configuration_id,
+            requested_view="front",
+            mode="strict",
+            prompt="queued while capacity is full",
+            width=64,
+            height=64,
+            status=BatchStatus.QUEUED.value,
+            input_snapshot=source_batch.input_snapshot,
+            created_by_user_id=source_batch.created_by_user_id,
+        )
+        session.add(queued_batch)
+        await session.flush()
+        queued_step = GenerationStep(
+            batch_id=queued_batch.id,
+            idempotency_key=f"queued-limit-{uuid4()}",
+        )
+        session.add(queued_step)
+        await session.commit()
+        queued_step_id = queued_step.id
+    context = WorkerContext(
+        session_factory=session_factory,
+        object_store=store,
+        provider_registry=ProviderRegistry(
+            secret_key_base64=get_settings().secret_key_base64
+        ),
+        max_concurrency=4,
+        provider_concurrency_limits={"mock": 1},
+    )
+
+    assert not await execute_step(queued_step_id, worker_id="limited-worker", context=context)
+    global_context = WorkerContext(
+        session_factory=session_factory,
+        object_store=store,
+        provider_registry=context.provider_registry,
+        max_concurrency=1,
+    )
+    assert not await execute_step(
+        queued_step_id, worker_id="globally-limited-worker", context=global_context
+    )
+    async with session_factory() as session:
+        queued = await session.get(GenerationStep, queued_step_id)
+        assert queued.status == StepStatus.QUEUED.value
+        assert queued.lease_owner is None
