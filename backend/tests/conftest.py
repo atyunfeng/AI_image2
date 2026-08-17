@@ -12,6 +12,7 @@ from aiimage.assets.models import Asset  # noqa: F401
 from aiimage.assets.storage import InMemoryObjectStore, get_object_store
 from aiimage.audit.models import AuditEvent  # noqa: F401
 from aiimage.auth.models import Role, User  # noqa: F401
+from aiimage.bulk.models import BulkJob, BulkJobRow  # noqa: F401
 from aiimage.auth.service import create_access_token, create_user
 from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
 from aiimage.config import get_settings
