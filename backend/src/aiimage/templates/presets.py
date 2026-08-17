@@ -1,6 +1,59 @@
 from copy import deepcopy
 from typing import Any
 
+
+def _marketplace_pack(
+    *,
+    slug: str,
+    name: str,
+    market: str,
+    locale: str,
+    size: int,
+    detail_height: int | None = None,
+    image_format: str = "JPEG",
+) -> dict[str, Any]:
+    detail_height = detail_height or size
+    return {
+        "slug": slug,
+        "name": name,
+        "kind": "platform",
+        "rules": {
+            "market": market,
+            "locale": locale,
+            "format": image_format,
+            "max_file_bytes": 5_242_880,
+            "safe_margin": 0.06,
+            "source_note": "first_party_default_verify_before_publish",
+            "slots": [
+                {
+                    "key": "hero_front",
+                    "label": "正面主图",
+                    "view": "front",
+                    "width": size,
+                    "height": size,
+                    "background": "white",
+                    "allow_text": False,
+                },
+                {
+                    "key": "detail_feature",
+                    "label": "卖点详情",
+                    "view": "detail",
+                    "width": size,
+                    "height": detail_height,
+                    "background": "brand",
+                    "allow_text": True,
+                    "text_region": [
+                        size // 2,
+                        detail_height // 16,
+                        size - size // 16,
+                        detail_height - detail_height // 16,
+                    ],
+                },
+            ],
+        },
+    }
+
+
 _PLATFORM_PACKS: tuple[dict[str, Any], ...] = (
     {
         "slug": "taobao-tmall-cn",
@@ -131,6 +184,59 @@ _PLATFORM_PACKS: tuple[dict[str, Any], ...] = (
             ],
         },
     },
+    _marketplace_pack(
+        slug="jd-cn", name="京东（中国站）", market="CN", locale="zh-CN", size=1600
+    ),
+    _marketplace_pack(
+        slug="pinduoduo-cn",
+        name="拼多多（中国站）",
+        market="CN",
+        locale="zh-CN",
+        size=1200,
+    ),
+    _marketplace_pack(
+        slug="douyin-cn",
+        name="抖音电商（中国站）",
+        market="CN",
+        locale="zh-CN",
+        size=1200,
+        detail_height=1500,
+    ),
+    _marketplace_pack(
+        slug="shopify-global",
+        name="Shopify（全球默认）",
+        market="GLOBAL",
+        locale="en-US",
+        size=2048,
+    ),
+    _marketplace_pack(
+        slug="temu-global",
+        name="Temu（全球默认）",
+        market="GLOBAL",
+        locale="en-US",
+        size=1600,
+    ),
+    _marketplace_pack(
+        slug="shopee-sea",
+        name="Shopee（东南亚默认）",
+        market="SEA",
+        locale="en-SG",
+        size=1200,
+    ),
+    _marketplace_pack(
+        slug="lazada-sea",
+        name="Lazada（东南亚默认）",
+        market="SEA",
+        locale="en-SG",
+        size=1200,
+    ),
+    _marketplace_pack(
+        slug="ebay-global",
+        name="eBay（全球默认）",
+        market="GLOBAL",
+        locale="en-US",
+        size=1600,
+    ),
 )
 
 _SUPPORT_PACKS: tuple[dict[str, Any], ...] = (
