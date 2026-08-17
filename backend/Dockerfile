@@ -1,5 +1,6 @@
-FROM ghcr.io/astral-sh/uv:0.8.14-python3.13-bookworm-slim
+FROM python:3.13-slim-bookworm
 WORKDIR /app
+RUN pip install --no-cache-dir uv==0.8.14
 COPY backend/pyproject.toml backend/uv.lock ./
 RUN uv sync --frozen --no-dev
 COPY backend/alembic.ini ./alembic.ini
