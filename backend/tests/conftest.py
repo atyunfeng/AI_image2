@@ -17,6 +17,7 @@ from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noq
 from aiimage.config import get_settings
 from aiimage.db import Base
 from aiimage.models.models import ModelConfiguration  # noqa: F401
+from aiimage.workflow.models import GenerationBatch, GenerationStep  # noqa: F401
 
 
 @pytest_asyncio.fixture
