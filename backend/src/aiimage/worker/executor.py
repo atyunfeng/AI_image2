@@ -18,6 +18,10 @@ from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
 from aiimage.models.models import ModelConfiguration
 from aiimage.providers.registry import ProviderRegistry
 from aiimage.quality.service import run_structural_quality
+from aiimage.templates.models import (  # noqa: F401 - registers worker foreign-key metadata
+    ProductionPlan,
+    ProductionPlanItem,
+)
 from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.state import BatchStatus, StepStatus
 

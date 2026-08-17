@@ -3,8 +3,8 @@
 from collections.abc import Sequence
 
 import sqlalchemy as sa
-from alembic import op
 
+from alembic import op
 
 revision: str = "0001_identity_audit"
 down_revision: str | None = None

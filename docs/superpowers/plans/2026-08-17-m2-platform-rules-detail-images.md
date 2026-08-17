@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-17-ecommerce-ai-image-platform-design.md`
 
+**Status:** Implemented on `feat/m2-platform-rules-detail-images`; final verification evidence is recorded by `scripts/verify-m2.sh`.
+
 ## Global Constraints
 
 - This plan covers M2 only: first-party platform packs, apparel/category packs, brand packs, deterministic text composition, plan compilation, and structural QA.
