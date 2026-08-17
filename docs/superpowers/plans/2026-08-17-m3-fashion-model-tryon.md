@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-17-ecommerce-ai-image-platform-design.md`
 
+**Implementation status:** Completed on `feat/m3-fashion-model-tryon`. Full local verification covers Ruff, 54 backend tests, 7 frontend tests, lint, production build, healthy Docker Compose services, and M1/M2/M3 Playwright flows. Mock Provider proves orchestration only; real-provider quality gates remain open.
+
 ## Global Constraints
 
 - This plan covers M3 only: system/brand model profiles, model references, specialized fashion plans, multi-angle, virtual try-on, strict-reference validation, and M3 review evidence.
