@@ -144,10 +144,10 @@
 - `POST /edit-projects/{id}/selections` returns an immutable mask for background or foreground/product using local pixel analysis; person/garment selection requires a configured `segment` provider and otherwise returns a clear 422 response.
 - Layer create, update, duplicate, reorder and delete endpoints operate on a draft layer set and `POST /compose` materializes a new immutable revision.
 
-- [ ] Test foreground/background masks, unsupported semantic selection, layer ordering/locking/visibility/opacity and deterministic composition.
-- [ ] Implement local corner-color segmentation and persistent layer services.
-- [ ] Replace the single text/logo form with a keyboard-accessible layer list and property editor while retaining existing revision history.
-- [ ] Run editing tests and commit as `feat: complete selection and layer editing`.
+- [x] Test foreground/background masks, unsupported semantic selection, layer ordering/locking/visibility/opacity and deterministic composition.
+- [x] Implement local corner-color segmentation and persistent layer services.
+- [x] Replace the single text/logo form with a keyboard-accessible layer list and property editor while retaining existing revision history.
+- [x] Run editing tests and commit as `feat: complete selection and layer editing`.
 
 ### Task 6: Export records, operations metrics, filters and alerts
 
