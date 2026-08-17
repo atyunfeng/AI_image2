@@ -19,9 +19,16 @@ class GenerationBatch(Base):
     production_plan_item_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("production_plan_items.id"), nullable=True, unique=True
     )
+    fashion_plan_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("fashion_plans.id"), nullable=True, index=True
+    )
+    model_profile_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("model_profiles.id"), nullable=True, index=True
+    )
     product_id: Mapped[UUID] = mapped_column(ForeignKey("products.id"))
     model_configuration_id: Mapped[UUID] = mapped_column(ForeignKey("model_configurations.id"))
     requested_view: Mapped[str] = mapped_column(String(30))
+    capability: Mapped[str] = mapped_column(String(50), default="reference_to_image")
     mode: Mapped[str] = mapped_column(String(20), default="strict")
     prompt: Mapped[str] = mapped_column(Text)
     width: Mapped[int]

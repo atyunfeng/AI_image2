@@ -10,6 +10,7 @@ from aiimage.auth.models import User  # noqa: F401
 from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
 from aiimage.config import get_settings
 from aiimage.db import Base
+from aiimage.fashion.models import FashionPlan  # noqa: F401
 from aiimage.models.models import ModelConfiguration  # noqa: F401
 from aiimage.quality.models import QualityCheck, QualityRun  # noqa: F401
 from aiimage.review.models import ReviewDecision  # noqa: F401

@@ -26,9 +26,12 @@ def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDeta
         id=batch.id,
         production_plan_id=batch.production_plan_id,
         production_plan_item_id=batch.production_plan_item_id,
+        fashion_plan_id=batch.fashion_plan_id,
+        model_profile_id=batch.model_profile_id,
         product_id=batch.product_id,
         model_configuration_id=batch.model_configuration_id,
         requested_view=batch.requested_view,
+        capability=batch.capability,
         mode=batch.mode,
         status=batch.status,
         prompt=batch.prompt,
@@ -97,4 +100,3 @@ async def create_batch_endpoint(
     except BatchValidationError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
     return BatchResponse.model_validate(batch)
-
