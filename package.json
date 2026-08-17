@@ -7,6 +7,10 @@
     "test:web": "pnpm --dir apps/web test",
     "test:e2e": "pnpm --dir apps/web test:e2e",
     "lint:web": "pnpm --dir apps/web lint"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "unrs-resolver"
+    ]
   }
 }
-
