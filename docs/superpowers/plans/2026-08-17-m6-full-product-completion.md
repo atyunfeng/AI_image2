@@ -41,11 +41,11 @@
 - `PATCH /api/v1/admin/users/{id}` updates roles, active state or password while preventing the final active administrator from being disabled.
 - `GET /api/v1/admin/audit` filters by event type, actor and date with newest-first pagination.
 
-- [ ] Write API tests proving admin-only access, redacted responses, lifecycle changes and final-admin protection.
-- [ ] Implement schemas and services using existing `create_user`, `hash_password` and `record_audit_event` functions.
-- [ ] Add the two admin pages with visible labels, inline feedback and responsive tables.
-- [ ] Run `uv run --project backend pytest backend/tests/admin -v` and targeted frontend tests.
-- [ ] Commit as `feat: add user governance and audit console`.
+- [x] Write API tests proving admin-only access, redacted responses, lifecycle changes and final-admin protection.
+- [x] Implement schemas and services using existing `create_user`, `hash_password` and `record_audit_event` functions.
+- [x] Add the two admin pages with visible labels, inline feedback and responsive tables.
+- [x] Run `uv run --project backend pytest backend/tests/admin -v` and targeted frontend tests.
+- [x] Commit as `feat: add user governance and audit console`.
 
 ### Task 2: Product lifecycle, truth anchors, history and Excel import
 

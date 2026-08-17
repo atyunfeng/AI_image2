@@ -19,3 +19,7 @@ export type BulkJobRow = { id: string; row_number: number; sku: string; status: 
 export type BulkJob = { id: string; filename: string; dry_run: boolean; status: string; model_configuration_id: string; category_pack_version_id: string; brand_pack_version_id: string; total_rows: number; succeeded_rows: number; failed_rows: number; created_at: string; rows: BulkJobRow[] };
 export type CostSummary = { currency: string; task_count: number; succeeded_count: number; failed_count: number; reported_cost_minor: number; average_cost_minor: number; success_rate: number };
 export type CostReport = { generated_at: string; cost_basis: "provider_reported_or_estimated"; summaries: CostSummary[]; daily: { date: string; currency: string; task_count: number; reported_cost_minor: number }[]; breakdown: { provider: string; model: string; platform: string; sku: string; currency: string; task_count: number; succeeded_count: number; failed_count: number; reported_cost_minor: number }[] };
+export type UserRole = "admin" | "operator" | "designer" | "reviewer";
+export type AdminUser = { id: string; email: string; roles: UserRole[]; is_active: boolean; created_at: string };
+export type AuditEvent = { id: string; actor_user_id: string | null; event_type: string; details: Record<string, unknown>; created_at: string };
+export type AuditEventPage = { total: number; items: AuditEvent[] };

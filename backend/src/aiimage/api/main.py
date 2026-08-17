@@ -1,6 +1,7 @@
 import uvicorn
 from fastapi import APIRouter, FastAPI
 
+from aiimage.admin.router import router as admin_router
 from aiimage.analytics.router import router as analytics_router
 from aiimage.assets.router import router as asset_router
 from aiimage.auth.router import router as auth_router
@@ -27,6 +28,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(router)
+    app.include_router(admin_router, prefix="/api/v1")
     app.include_router(auth_router, prefix="/api/v1")
     app.include_router(analytics_router, prefix="/api/v1")
     app.include_router(asset_router, prefix="/api/v1")
