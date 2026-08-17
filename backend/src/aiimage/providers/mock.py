@@ -1,4 +1,5 @@
 import hashlib
+import json
 from io import BytesIO
 
 from PIL import Image, ImageDraw
@@ -11,7 +12,17 @@ class MockProvider:
         return None
 
     async def generate(self, request: GenerationRequest) -> GenerationResult:
-        request_hash = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
+        serializable = request.model_dump(exclude={"reference_images"})
+        serializable["reference_images"] = [
+            {
+                "mime_type": reference.mime_type,
+                "sha256": hashlib.sha256(reference.content).hexdigest(),
+            }
+            for reference in request.reference_images
+        ]
+        request_hash = hashlib.sha256(
+            json.dumps(serializable, sort_keys=True).encode()
+        ).hexdigest()
         image = Image.new("RGB", (request.width, request.height), color=f"#{request_hash[:6]}")
         ImageDraw.Draw(image).text((16, 16), request_hash[:16], fill="white")
         buffer = BytesIO()
@@ -25,4 +36,3 @@ class MockProvider:
             provider_request_id=f"mock-{request_hash[:24]}",
             estimated_cost_minor=0,
         )
-
