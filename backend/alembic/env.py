@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from aiimage.config import get_settings
 from aiimage.db import Base
+from aiimage.audit.models import AuditEvent  # noqa: F401
+from aiimage.auth.models import User  # noqa: F401
 
 
 config = context.config
@@ -53,4 +55,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-
