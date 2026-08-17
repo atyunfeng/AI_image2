@@ -40,3 +40,33 @@ class CostReportResponse(BaseModel):
     daily: list[DailyCostPoint]
     breakdown: list[CostBreakdownRow]
 
+
+class OperationAlert(BaseModel):
+    code: str
+    severity: Literal["info", "warning", "critical"]
+    title: str
+    detail: str
+    action_url: str
+
+
+class FailureClassRow(BaseModel):
+    classification: str
+    count: int
+
+
+class OperationsReportResponse(BaseModel):
+    generated_at: datetime
+    queued_count: int
+    running_count: int
+    review_pending_count: int
+    failed_count: int
+    total_calls: int
+    succeeded_calls: int
+    retry_calls: int
+    success_rate: float
+    retry_rate: float
+    latency_p50_ms: float
+    latency_p95_ms: float
+    failure_classes: list[FailureClassRow]
+    cost_groups: list[CostSummary]
+    alerts: list[OperationAlert]

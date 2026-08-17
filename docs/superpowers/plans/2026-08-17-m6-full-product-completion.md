@@ -169,10 +169,10 @@
 - `GET /analytics/operations` returns queue/review/failure counts, calls, success/retry rate, P50/P95 latency, cost groups, failure classes and actionable alert rows.
 - Cost and operations pages expose date, Provider, platform, SKU and status filters without presenting estimates as settled bills.
 
-- [ ] Test export immutability and operations percentile/failure/alert aggregation.
-- [ ] Persist export archives as immutable assets and expose product/export history.
-- [ ] Upgrade dashboard and analytics UI with filters, failure categories and retry links.
-- [ ] Run analytics/export tests and commit as `feat: add operations observability and export history`.
+- [x] Test export immutability and operations percentile/failure/alert aggregation.
+- [x] Persist export archives as immutable assets and expose product/export history.
+- [x] Upgrade dashboard and analytics UI with filters, failure categories and retry links.
+- [x] Run analytics/export tests and commit as `feat: add operations observability and export history`.
 
 ### Task 7: Full-document verification and delivery
 

@@ -138,6 +138,7 @@ async def _lease_step(
             if running_for_provider >= provider_limit:
                 return None
         step.status = StepStatus.RUNNING.value
+        step.started_at = now
         step.lease_owner = worker_id
         step.lease_expires_at = now + LEASE_DURATION
         step.attempt_count += 1
@@ -231,6 +232,7 @@ async def _mark_failed(step_id: UUID, classification: str, context: WorkerContex
             return
         batch = await session.get(GenerationBatch, step.batch_id)
         step.status = StepStatus.FAILED.value
+        step.completed_at = datetime.now(UTC)
         step.error_classification = classification
         step.lease_owner = None
         step.lease_expires_at = None
@@ -328,6 +330,7 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
                 authoritative_copy=batch.input_snapshot.get("authoritative_copy"),
             )
         current.status = StepStatus.SUCCEEDED.value
+        current.completed_at = datetime.now(UTC)
         current.provider_request_id = result.provider_request_id
         current.output_asset_id = output_asset.id
         current.estimated_cost_minor = result.estimated_cost_minor
