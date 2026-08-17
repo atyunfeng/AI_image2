@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -45,7 +46,7 @@ async def create_model_endpoint(
 
 @router.post("/{model_id}/test")
 async def test_model_connection(
-    model_id: str,
+    model_id: UUID,
     user: AdminUser,
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],

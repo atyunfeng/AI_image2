@@ -1,4 +1,5 @@
 from typing import Annotated
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
@@ -61,7 +62,7 @@ async def list_batches(
 
 @router.get("/{batch_id}", response_model=BatchDetailResponse)
 async def get_batch(
-    batch_id: str,
+    batch_id: UUID,
     user: BatchUser,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> BatchDetailResponse:
