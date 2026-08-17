@@ -7,7 +7,9 @@ export default defineConfig({
   timeout: 90_000,
   use: {
     baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000",
-    executablePath: existsSync(edgePath) ? edgePath : undefined,
+    launchOptions: {
+      executablePath: existsSync(edgePath) ? edgePath : undefined,
+    },
     trace: "retain-on-failure",
   },
 });
