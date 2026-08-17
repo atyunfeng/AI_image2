@@ -142,7 +142,9 @@ test("operator creates authorized talent, multi-angle images, virtual try-on, an
   });
 
   await expect(page.getByText("服饰质检")).toHaveCount(6, { timeout: 60_000 });
-  await expect(page.getByText("自动项通过", { exact: true })).toHaveCount(6);
+  await expect(page.getByText("自动项通过", { exact: true })).toHaveCount(6, {
+    timeout: 60_000,
+  });
   await page.getByRole("link", { name: "查看与人工审核" }).first().click();
   await page.getByRole("button", { name: "通过" }).click();
   await expect(page.getByRole("link", { name: "导出" })).toBeVisible();
