@@ -1,0 +1,4 @@
+export type ProductReference = { id: string; asset_id: string; view: "front" | "side" | "back" | "detail" | "logo"; sha256: string; mime_type: string; size_bytes: number };
+export type Product = { id: string; sku: string; name: string; category: "apparel" | "shoes" | "hats" | "other"; references?: ProductReference[] };
+export type ModelConfiguration = { id: string; name: string; provider: string; model_id: string; base_url: string | null; capabilities: string[]; has_key: boolean; key_suffix: string | null; is_enabled: boolean };
+export type Batch = { id: string; product_id: string; model_configuration_id: string; requested_view: string; mode: string; status: string; prompt: string; width: number; height: number; output_asset_id?: string | null; provider_request_id?: string | null; estimated_cost_minor?: number; error_classification?: string | null };

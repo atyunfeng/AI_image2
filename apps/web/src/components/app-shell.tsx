@@ -1,0 +1,6 @@
+import Link from "next/link";
+const navigation = [["/", "总览"], ["/products", "商品"], ["/models", "模型"], ["/batches", "批次"], ["/review", "审核"]];
+
+export function AppShell({ children, email }: { children: React.ReactNode; email: string }) {
+  return <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]"><aside className="border-b border-white/10 bg-[#0d101b] p-6 lg:min-h-screen lg:border-b-0 lg:border-r"><a href="/" className="mb-10 flex items-center gap-3"><span className="brand-mark">A</span><span className="font-semibold">AI 生图中台</span></a><nav className="flex gap-2 overflow-auto lg:flex-col">{navigation.map(([href,label],index)=><Link key={href} href={href} className="nav-link"><span className="text-xs text-orange-300">0{index+1}</span>{label}</Link>)}</nav><div className="mt-10 hidden border-t border-white/10 pt-5 text-xs text-slate-500 lg:block"><p>当前账户</p><p className="mt-1 truncate text-slate-300">{email}</p></div></aside><div className="min-w-0"><header className="flex h-16 items-center justify-between border-b border-white/10 px-6 lg:px-10"><p className="text-xs uppercase tracking-[0.24em] text-slate-500">M1 · Production workspace</p><span className="status-pill">系统在线</span></header><main className="p-6 lg:p-10">{children}</main></div></div>;
+}
