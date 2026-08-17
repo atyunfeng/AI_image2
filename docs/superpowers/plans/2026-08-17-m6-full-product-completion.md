@@ -189,4 +189,4 @@
 - [x] Add the full M6 Playwright flow and layout assertions for every new page.
 - [x] Run targeted tests during each task, then run `scripts/verify-m6.sh` across backend, frontend, build, Compose health and M1–M6 E2E.
 - [x] Run the UI detector once, capture desktop/mobile screenshots, perform the finish review and document remaining model-dependent release gates.
-- [ ] Commit documentation, merge to `main`, verify merged `main`, push when a remote exists and clean merged branches only after remote containment is proven.
+- [x] Commit documentation, merge to `main`, verify merged `main`, push when a remote exists and clean merged branches only after remote containment is proven.
