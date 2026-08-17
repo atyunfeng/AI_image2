@@ -28,3 +28,7 @@ button,a,input,select,textarea { transition:all .18s ease; }
 .data-table { width:100%; border-collapse:collapse; }
 .data-table th,.data-table td { border-bottom:1px solid rgb(255 255 255/.07); padding:14px 12px; text-align:left; font-size:13px; }
 .data-table th { color:#778199; font-size:11px; letter-spacing:.08em; text-transform:uppercase; }
+.plan-slot { min-height:112px; border:1px solid rgb(255 255 255/.08); border-radius:14px; background:rgb(9 11 18/.44); padding:15px; }
+.version-chip { display:inline-flex; align-items:center; border:1px solid rgb(255 255 255/.1); border-radius:999px; padding:5px 9px; color:#98a2b7; font-size:11px; white-space:nowrap; }
+.failure-pill { display:inline-flex; align-items:center; border:1px solid rgb(248 113 113/.25); border-radius:999px; background:rgb(248 113 113/.08); padding:5px 9px; color:#fca5a5; font-size:11px; }
+@media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; } }
