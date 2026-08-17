@@ -17,6 +17,7 @@ from aiimage.composition.service import create_composed_asset
 from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
 from aiimage.models.models import ModelConfiguration
 from aiimage.providers.registry import ProviderRegistry
+from aiimage.quality.service import run_structural_quality
 from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.state import BatchStatus, StepStatus
 
@@ -171,7 +172,11 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
                 reference_images=references,
                 width=batch.width,
                 height=batch.height,
-                parameters={"requested_view": batch.requested_view, "mode": batch.mode},
+                parameters={
+                    "requested_view": batch.requested_view,
+                    "mode": batch.mode,
+                    "background": batch.input_snapshot.get("slot_rules", {}).get("background"),
+                },
             )
         )
         _validate_output(result.content, result.mime_type, result.content_sha256)
@@ -221,6 +226,21 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         current_batch = await session.get(GenerationBatch, current.batch_id)
         if current_batch is not None:
             current_batch.status = BatchStatus.QA_PENDING.value
-            current_batch.status = BatchStatus.REVIEW_PENDING.value
+            slot_rules = current_batch.input_snapshot.get("slot_rules")
+            if slot_rules:
+                quality_run = await run_structural_quality(
+                    session,
+                    context.object_store,
+                    batch_id=current_batch.id,
+                    output_asset=output_asset,
+                    rules=slot_rules,
+                )
+                if quality_run.passed:
+                    current_batch.status = BatchStatus.REVIEW_PENDING.value
+                else:
+                    current_batch.status = BatchStatus.FAILED.value
+                    current.error_classification = "quality_blocking"
+            else:
+                current_batch.status = BatchStatus.REVIEW_PENDING.value
         await session.commit()
     return True

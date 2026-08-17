@@ -23,8 +23,17 @@ class MockProvider:
         request_hash = hashlib.sha256(
             json.dumps(serializable, sort_keys=True).encode()
         ).hexdigest()
-        image = Image.new("RGB", (request.width, request.height), color=f"#{request_hash[:6]}")
-        ImageDraw.Draw(image).text((16, 16), request_hash[:16], fill="white")
+        white_background = request.parameters.get("background") == "white"
+        background = "white" if white_background else f"#{request_hash[:6]}"
+        image = Image.new("RGB", (request.width, request.height), color=background)
+        draw = ImageDraw.Draw(image)
+        inset = max(16, min(request.width, request.height) // 5)
+        draw.rounded_rectangle(
+            (inset, inset, request.width - inset, request.height - inset),
+            radius=max(4, inset // 8),
+            fill=f"#{request_hash[6:12]}",
+        )
+        draw.text((inset + 8, inset + 8), request_hash[:16], fill="white")
         buffer = BytesIO()
         image.save(buffer, format="PNG", optimize=False)
         content = buffer.getvalue()

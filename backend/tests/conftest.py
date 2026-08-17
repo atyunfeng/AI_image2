@@ -17,6 +17,7 @@ from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noq
 from aiimage.config import get_settings
 from aiimage.db import Base
 from aiimage.models.models import ModelConfiguration  # noqa: F401
+from aiimage.quality.models import QualityCheck, QualityRun  # noqa: F401
 from aiimage.review.models import ReviewDecision  # noqa: F401
 from aiimage.templates.models import (  # noqa: F401
     ProductionPlan,

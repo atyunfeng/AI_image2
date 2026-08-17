@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from aiimage.quality.service import has_blocking_quality_failure
 from aiimage.review.models import ReviewDecision
 from aiimage.review.schemas import ReviewRequest
 from aiimage.workflow.models import GenerationBatch, GenerationStep
@@ -44,6 +45,8 @@ async def review_batch(
     if payload.decision == "approve":
         if step.status != StepStatus.SUCCEEDED.value or step.output_asset_id is None:
             raise ReviewConflictError("Approval requires a succeeded output asset")
+        if await has_blocking_quality_failure(session, batch.id):
+            raise ReviewConflictError("Batch has blocking quality failures")
         batch.status = BatchStatus.APPROVED.value
     else:
         batch.status = BatchStatus.REJECTED.value
