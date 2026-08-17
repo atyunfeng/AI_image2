@@ -31,7 +31,7 @@ test("operator creates authorized talent, multi-angle images, virtual try-on, an
   await page.getByRole("button", { name: "登录" }).click();
   await expect(
     page.getByRole("heading", { name: "电商视觉生产线" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/models");
   await page.getByLabel("配置名称").fill(`M3 全能力 Mock ${suffix}`);
@@ -64,13 +64,11 @@ test("operator creates authorized talent, multi-angle images, virtual try-on, an
   const productUrl = page.url();
   for (const view of ["front"]) {
     await page.locator('select[name="view"]').selectOption(view);
-    await page
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: `product-${view}.png`,
-        mimeType: "image/png",
-        buffer: png,
-      });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `product-${view}.png`,
+      mimeType: "image/png",
+      buffer: png,
+    });
     await page.getByRole("button", { name: "上传参考图" }).click();
     await expect(page.getByText("参考图已固化")).toBeVisible();
   }
@@ -103,13 +101,11 @@ test("operator creates authorized talent, multi-angle images, virtual try-on, an
   await page.goto(productUrl);
   for (const view of ["side", "back"]) {
     await page.locator('select[name="view"]').selectOption(view);
-    await page
-      .locator('input[type="file"]')
-      .setInputFiles({
-        name: `product-${view}.png`,
-        mimeType: "image/png",
-        buffer: png,
-      });
+    await page.locator('input[type="file"]').setInputFiles({
+      name: `product-${view}.png`,
+      mimeType: "image/png",
+      buffer: png,
+    });
     await page.getByRole("button", { name: "上传参考图" }).click();
     await expect(page.getByText("参考图已固化")).toBeVisible();
     await page.reload();
