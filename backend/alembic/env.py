@@ -1,20 +1,19 @@
 import asyncio
 from logging.config import fileConfig
 
-from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from aiimage.config import get_settings
-from aiimage.db import Base
+from aiimage.assets.models import Asset  # noqa: F401
 from aiimage.audit.models import AuditEvent  # noqa: F401
 from aiimage.auth.models import User  # noqa: F401
-from aiimage.assets.models import Asset  # noqa: F401
 from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
+from aiimage.config import get_settings
+from aiimage.db import Base
 from aiimage.models.models import ModelConfiguration  # noqa: F401
 from aiimage.review.models import ReviewDecision  # noqa: F401
 from aiimage.workflow.models import GenerationBatch, GenerationStep  # noqa: F401
-
+from alembic import context
 
 config = context.config
 if config.config_file_name is not None:

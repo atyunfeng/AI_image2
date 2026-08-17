@@ -3,7 +3,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, model_validator
 
-
 RejectionReason = Literal[
     "product_drift",
     "color_error",
