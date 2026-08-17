@@ -142,7 +142,7 @@ _SUPPORT_PACKS: tuple[dict[str, Any], ...] = (
             "category": "apparel",
             "slots": {
                 "hero_front": {"required_reference_views": ["front"]},
-                "detail_material": {"required_reference_views": ["detail"]},
+                "detail_material": {"required_reference_views": ["detail", "front"]},
                 "detail_feature": {"required_reference_views": ["front"]},
             },
         },
