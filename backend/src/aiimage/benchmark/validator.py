@@ -26,7 +26,9 @@ def validate_product(product: BenchmarkProduct, *, base_dir: Path) -> None:
         if reference.sha256:
             digest = hashlib.sha256(path.read_bytes()).hexdigest()
             if digest != reference.sha256:
-                raise BenchmarkValidationError(f"{product.sku}: SHA-256 mismatch for {reference.path}")
+                raise BenchmarkValidationError(
+                    f"{product.sku}: SHA-256 mismatch for {reference.path}"
+                )
 
 
 def validate_manifest(data: dict[str, Any], *, base_dir: Path) -> BenchmarkManifest:
