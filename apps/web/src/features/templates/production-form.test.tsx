@@ -7,7 +7,7 @@ import { ProductionForm } from "./production-form";
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) }));
 
 const products = [{ id: "product-1", sku: "SKU-1", name: "衬衫", category: "apparel" as const }];
-const models = [{ id: "model-1", name: "Mock", provider: "mock", model_id: "mock-v1", base_url: null, capabilities: ["reference_to_image"], has_key: true, key_suffix: "test", is_enabled: true }];
+const models = [{ id: "model-1", name: "Mock", provider: "mock", model_id: "mock-v1", base_url: null, billing_currency: "USD", provider_options: {}, capabilities: ["reference_to_image"], has_key: true, key_suffix: "test", is_enabled: true }];
 const packs = [
   { id: "p1", version_id: "amazon-v1", slug: "amazon-global", name: "Amazon", kind: "platform" as const, version: 1, status: "published" as const, rules: {}, source: "first_party_default", published_at: "2026-08-17T00:00:00Z" },
   { id: "p2", version_id: "apparel-v1", slug: "apparel-core", name: "服装基础套图", kind: "category" as const, version: 1, status: "published" as const, rules: {}, source: "first_party_default", published_at: "2026-08-17T00:00:00Z" },
