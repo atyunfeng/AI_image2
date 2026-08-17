@@ -14,6 +14,8 @@ from aiimage.assets.storage import ObjectStore
 from aiimage.auth.models import User  # noqa: F401 - registers worker foreign-key metadata
 from aiimage.catalog.models import ProductReference
 from aiimage.composition.service import create_composed_asset
+from aiimage.editing.evidence import create_edit_evidence
+from aiimage.editing.models import EditRevision
 from aiimage.fashion.evidence import create_fashion_evidence
 from aiimage.fashion.models import FashionPlan  # noqa: F401 - registers worker metadata
 from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
@@ -118,12 +120,20 @@ async def _lease_step(
 async def _load_references(
     batch: GenerationBatch,
     context: WorkerContext,
-) -> tuple[list[ReferenceImage], list[ReferenceImage]]:
+) -> tuple[list[ReferenceImage], list[ReferenceImage], list[ReferenceImage]]:
     product_reference_ids = [
         UUID(value) for value in batch.input_snapshot.get("reference_ids", [])
     ]
     model_reference_ids = [
         UUID(value) for value in batch.input_snapshot.get("model_reference_ids", [])
+    ]
+    edit_asset_ids = [
+        UUID(value)
+        for value in [
+            batch.input_snapshot.get("edit_source_asset_id"),
+            batch.input_snapshot.get("edit_mask_asset_id"),
+        ]
+        if value
     ]
     async with context.session_factory() as session:
         product_references = list(
@@ -144,7 +154,7 @@ async def _load_references(
         )
         asset_ids = [
             reference.asset_id for reference in [*product_references, *model_references]
-        ]
+        ] + edit_asset_ids
         assets = {
             asset.id: asset
             for asset in (
@@ -163,7 +173,16 @@ async def _load_references(
             )
         return images
 
-    return await images_for(product_references), await images_for(model_references)
+    edit_images = []
+    for asset_id in edit_asset_ids:
+        asset = assets[asset_id]
+        edit_images.append(
+            ReferenceImage(
+                content=await context.object_store.get(object_key=asset.object_key),
+                mime_type=asset.mime_type,
+            )
+        )
+    return edit_images, await images_for(product_references), await images_for(model_references)
 
 
 async def _fashion_authorization_is_current(
@@ -188,6 +207,10 @@ async def _mark_failed(step_id: UUID, classification: str, context: WorkerContex
         step.lease_expires_at = None
         if batch is not None:
             batch.status = BatchStatus.FAILED.value
+            if batch.edit_revision_id is not None:
+                revision = await session.get(EditRevision, batch.edit_revision_id)
+                if revision is not None:
+                    revision.status = "failed"
         await session.commit()
 
 
@@ -200,14 +223,20 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         if not await _fashion_authorization_is_current(batch, context):
             await _mark_failed(step_id, "model_authorization_expired", context)
             return False
-        product_references, model_references = await _load_references(batch, context)
+        edit_references, product_references, model_references = await _load_references(
+            batch, context
+        )
         provider = context.provider_registry.get(configuration)
         result = await provider.generate(
             GenerationRequest(
                 idempotency_key=step.idempotency_key,
                 capability=Capability(batch.capability),
                 prompt=batch.prompt,
-                reference_images=[*product_references, *model_references],
+                reference_images=[
+                    *edit_references,
+                    *product_references,
+                    *model_references,
+                ],
                 width=batch.width,
                 height=batch.height,
                 parameters={
@@ -218,6 +247,11 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
                     "product_reference_count": len(product_references),
                     "model_reference_count": len(model_references),
                     "inferred_view": batch.input_snapshot.get("inferred_view", False),
+                    "edit_operation": batch.input_snapshot.get("edit_operation"),
+                    "edit_parameters": batch.input_snapshot.get("edit_parameters", {}),
+                    "edit_reference_roles": (
+                        ["source", "mask"][: len(edit_references)]
+                    ),
                 },
             )
         )
@@ -248,6 +282,12 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
             )
             session.add(asset)
             await session.flush()
+        if batch.edit_revision_id is not None and asset.parent_asset_id is None:
+            source_asset_id = batch.input_snapshot.get("edit_source_asset_id")
+            parent_asset_id = UUID(source_asset_id) if source_asset_id else None
+            asset.parent_asset_id = parent_asset_id if parent_asset_id != asset.id else None
+            asset.derivation_operation = batch.input_snapshot.get("edit_operation")
+            asset.derivation_parameters = batch.input_snapshot.get("edit_parameters", {})
         output_asset = asset
         slot_rules = batch.input_snapshot.get("slot_rules")
         if slot_rules:
@@ -269,7 +309,28 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         if current_batch is not None:
             current_batch.status = BatchStatus.QA_PENDING.value
             slot_rules = current_batch.input_snapshot.get("slot_rules")
-            if current_batch.fashion_plan_id is not None:
+            if current_batch.edit_revision_id is not None:
+                revision = await session.get(EditRevision, current_batch.edit_revision_id)
+                if revision is None:
+                    current_batch.status = BatchStatus.FAILED.value
+                    current.error_classification = "edit_revision_missing"
+                else:
+                    evidence = await create_edit_evidence(
+                        session,
+                        context.object_store,
+                        revision=revision,
+                        output_asset=output_asset,
+                        expected_width=current_batch.width,
+                        expected_height=current_batch.height,
+                    )
+                    revision.output_asset_id = output_asset.id
+                    revision.status = "ready" if evidence.automated_passed else "failed"
+                    if evidence.automated_passed:
+                        current_batch.status = BatchStatus.REVIEW_PENDING.value
+                    else:
+                        current_batch.status = BatchStatus.FAILED.value
+                        current.error_classification = "edit_evidence_blocking"
+            elif current_batch.fashion_plan_id is not None:
                 evidence = await create_fashion_evidence(
                     session,
                     context.object_store,
