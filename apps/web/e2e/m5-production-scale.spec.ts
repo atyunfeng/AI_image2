@@ -30,7 +30,7 @@ test("operator imports a marketplace CSV and sees cost operations", async ({ pag
   await page.goto("/bulk");
   await page.getByLabel("生图模型").selectOption({ label: `${modelName} · mock-m5-v1` });
   const csv = Buffer.from(`sku,name,category,platform_slug,mode\n${sku},M5 批量平台测试衬衫,apparel,jd-cn,strict\n`);
-  await page.getByLabel("CSV 文件").setInputFiles({ name: "m5-products.csv", mimeType: "text/csv", buffer: csv });
+  await page.getByLabel("CSV 或 XLSX 文件").setInputFiles({ name: "m5-products.csv", mimeType: "text/csv", buffer: csv });
   await page.getByRole("button", { name: "上传并创建任务" }).click();
   await expect(page.getByText("批量任务已创建，失败行不会影响成功行。")).toBeVisible();
   const importedRow = page.getByRole("row").filter({ hasText: sku });

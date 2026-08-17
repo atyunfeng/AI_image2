@@ -186,7 +186,7 @@
 **Interfaces:**
 - The E2E flow creates a user, edits a product and truth anchor, authors/publishes a template version, adjusts a plan item, executes/retries one image, uses a deterministic selection/layer, reviews, exports and sees the audit/operations record.
 
-- [ ] Add the full M6 Playwright flow and layout assertions for every new page.
-- [ ] Run targeted tests during each task, then run `scripts/verify-m6.sh` across backend, frontend, build, Compose health and M1–M6 E2E.
-- [ ] Run the UI detector once, capture desktop/mobile screenshots, perform the finish review and document remaining model-dependent release gates.
+- [x] Add the full M6 Playwright flow and layout assertions for every new page.
+- [x] Run targeted tests during each task, then run `scripts/verify-m6.sh` across backend, frontend, build, Compose health and M1–M6 E2E.
+- [x] Run the UI detector once, capture desktop/mobile screenshots, perform the finish review and document remaining model-dependent release gates.
 - [ ] Commit documentation, merge to `main`, verify merged `main`, push when a remote exists and clean merged branches only after remote containment is proven.

@@ -17,5 +17,10 @@ Runtime font dependency:
   Chinese/Japanese/Korean text layers in containerized image composition. The package is
   installed from Debian Bookworm repositories; no font binary is committed to this repository.
 
+Spreadsheet parsing dependency:
+
+- openpyxl, MIT License: reads operator-supplied XLSX bulk-import workbooks. No upstream source
+  file or workbook template is copied into this repository.
+
 Before copying or modifying upstream source, record the repository URL, fixed commit, license,
 copied paths, local destination, and modification summary here.
