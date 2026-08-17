@@ -38,4 +38,12 @@ button,a,input,select,textarea { transition:all .18s ease; }
 .output-option strong { display:block; color:#e9edf5; font-size:14px; }
 .output-option small { display:block; margin-top:5px; color:#778199; font-size:11px; line-height:1.5; }
 .failure-note { border:1px solid rgb(248 113 113/.2); border-radius:12px; background:rgb(248 113 113/.06); padding:12px 14px; color:#fca5a5; font-size:12px; line-height:1.6; }
+.editor-canvas { position:relative; overflow:hidden; border:1px solid rgb(255 255 255/.1); border-radius:14px; background:#fff; touch-action:none; }
+.editor-canvas img { display:block; width:100%; max-height:68vh; object-fit:contain; }
+.editor-canvas canvas { position:absolute; inset:0; width:100%; height:100%; cursor:crosshair; opacity:.58; }
+.revision-button { display:flex; width:100%; min-height:52px; cursor:pointer; flex-direction:column; align-items:flex-start; justify-content:center; border:1px solid rgb(255 255 255/.08); border-radius:12px; background:transparent; padding:10px 12px; color:#dce1eb; text-align:left; }
+.revision-button small { margin-top:3px; color:#778199; }
+.revision-button:hover { border-color:rgb(255 116 72/.35); }
+.revision-button-active { border-color:rgb(255 116 72/.6); background:rgb(255 116 72/.08); }
+.revision-button:disabled { cursor:not-allowed; opacity:.5; }
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition-duration:.01ms!important; animation-duration:.01ms!important; animation-iteration-count:1!important; } }

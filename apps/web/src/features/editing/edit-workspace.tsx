@@ -1,0 +1,82 @@
+"use client";
+/* eslint-disable @next/next/no-img-element */
+
+import { FormEvent, PointerEvent, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { EditEvidence, EditProject, ModelConfiguration } from "@/lib/types";
+
+const capabilityByOperation: Record<string, string> = { replace: "inpaint", remove: "inpaint", replace_background: "inpaint", outpaint: "outpaint", remove_background: "remove_background" };
+const operationLabels: Record<string, string> = { source: "原始图", replace: "局部替换", remove: "局部消除", replace_background: "更换背景", outpaint: "扩图", remove_background: "抠背景", compose: "版式与图层" };
+const evidenceLabels: Record<string, string> = { source_recorded: "源图已记录", mask_recorded_when_required: "必要蒙版已记录", output_dimensions: "输出尺寸符合请求", immutable_derivation: "未覆盖历史资产" };
+
+type Props = { project: EditProject; models: ModelConfiguration[]; evidence: Record<string, EditEvidence | null> };
+
+export function EditWorkspace({ project, models, evidence }: Props) {
+  const router = useRouter();
+  const readyRevisions = project.revisions.filter((revision) => revision.output_asset_id);
+  const [selectedId, setSelectedId] = useState(readyRevisions.at(-1)?.id ?? project.revisions[0].id);
+  const [tool, setTool] = useState<"brush" | "eraser">("brush");
+  const [brushSize, setBrushSize] = useState(48);
+  const [hasMask, setHasMask] = useState(false);
+  const [operation, setOperation] = useState("replace");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useRef(false);
+  const selected = project.revisions.find((revision) => revision.id === selectedId) ?? project.revisions[0];
+  const selectedIndex = readyRevisions.findIndex((revision) => revision.id === selected.id);
+  const requiredCapability = capabilityByOperation[operation];
+  const eligibleModels = models.filter((model) => model.is_enabled && model.capabilities.includes(requiredCapability));
+  const hasPending = project.revisions.some((revision) => ["queued", "running"].includes(revision.status));
+
+  useEffect(() => { if (!hasPending) return; const timer = setInterval(() => router.refresh(), 2500); return () => clearInterval(timer); }, [hasPending, router]);
+
+  const sourceUrl = `/api/backend/assets/${selected.output_asset_id ?? selected.source_asset_id}/content`;
+  const originalUrl = `/api/backend/assets/${project.source_asset_id}/content`;
+
+  function initializeCanvas(image: HTMLImageElement) {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    setHasMask(false);
+  }
+  function point(event: PointerEvent<HTMLCanvasElement>) {
+    const canvas = event.currentTarget; const bounds = canvas.getBoundingClientRect();
+    return { x: (event.clientX - bounds.left) * canvas.width / bounds.width, y: (event.clientY - bounds.top) * canvas.height / bounds.height };
+  }
+  function draw(event: PointerEvent<HTMLCanvasElement>) {
+    if (!drawing.current) return;
+    const canvas = event.currentTarget; const context = canvas.getContext("2d"); if (!context) return;
+    const current = point(event); context.lineWidth = brushSize; context.lineCap = "round"; context.lineJoin = "round"; context.strokeStyle = "rgba(255,255,255,.9)"; context.globalCompositeOperation = tool === "eraser" ? "destination-out" : "source-over"; context.lineTo(current.x, current.y); context.stroke();
+    if (tool === "brush") setHasMask(true);
+  }
+  function begin(event: PointerEvent<HTMLCanvasElement>) { drawing.current = true; event.currentTarget.setPointerCapture(event.pointerId); const context = event.currentTarget.getContext("2d"); const current = point(event); context?.beginPath(); context?.moveTo(current.x, current.y); draw(event); }
+  function end(event: PointerEvent<HTMLCanvasElement>) { drawing.current = false; event.currentTarget.getContext("2d")?.closePath(); }
+  function clearMask() { const canvas = canvasRef.current; if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height); setHasMask(false); }
+  async function maskFile(): Promise<File | null> { const canvas = canvasRef.current; if (!canvas) return null; const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png")); return blob ? new File([blob], "mask.png", { type: "image/png" }) : null; }
+
+  async function submitAi(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setMessage(""); const data = new FormData(event.currentTarget); const needsMask = requiredCapability === "inpaint";
+    if (needsMask && !hasMask) { setMessage("请先在图片上画出要修改的区域。"); setBusy(false); return; }
+    const mask = await maskFile(); if (mask && (hasMask || operation === "outpaint")) data.set("mask", mask);
+    data.set("parent_revision_id", selected.id); data.set("operation", operation); data.set("parameters_json", JSON.stringify({ invert_mask: data.get("invert_mask") === "on", mask_dilation: Number(data.get("mask_dilation")), mask_feather: Number(data.get("mask_feather")), canvas_width: Number(data.get("canvas_width")) || undefined, canvas_height: Number(data.get("canvas_height")) || undefined, snapshot_label: data.get("snapshot_label") || undefined }));
+    const response = await fetch(`/api/backend/edit-projects/${project.id}/revisions/ai`, { method: "POST", body: data });
+    if (response.ok) { setMessage("编辑任务已创建，正在生成和质检。"); clearMask(); router.refresh(); } else { const body = await response.json().catch(() => ({ detail: "创建失败" })); setMessage(body.detail ?? "创建失败"); }
+    setBusy(false);
+  }
+  async function submitCompose(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault(); setBusy(true); setMessage(""); const data = new FormData(event.currentTarget); const text = String(data.get("text") ?? "").trim();
+    const parameters = { canvas_width: Number(data.get("compose_width")), canvas_height: Number(data.get("compose_height")), x: Number(data.get("x")), y: Number(data.get("y")), scale: Number(data.get("scale")), rotation: Number(data.get("rotation")), background_blur: Number(data.get("background_blur")), background_color: data.get("background_color"), logo_x: Number(data.get("logo_x")), logo_y: Number(data.get("logo_y")), logo_width: Number(data.get("logo_width")), logo_opacity: Number(data.get("logo_opacity")), snapshot_label: data.get("compose_label") || undefined, text_layers: text ? [{ text, region: [Number(data.get("text_x")), Number(data.get("text_y")), Number(data.get("text_right")), Number(data.get("text_bottom"))], font_size: Number(data.get("font_size")), color: data.get("text_color") }] : [] };
+    data.set("parent_revision_id", selected.id); data.set("parameters_json", JSON.stringify(parameters));
+    for (const key of [...data.keys()]) if (!['parent_revision_id','parameters_json','logo'].includes(key)) data.delete(key);
+    const response = await fetch(`/api/backend/edit-projects/${project.id}/revisions/compose`, { method: "POST", body: data });
+    if (response.ok) { setMessage("版式编辑已生成新版本并进入审核。"); router.refresh(); } else { const body = await response.json().catch(() => ({ detail: "合成失败" })); setMessage(body.detail ?? "合成失败"); }
+    setBusy(false);
+  }
+
+  const selectedEvidence = evidence[selected.id];
+  return <div className="grid gap-6 2xl:grid-cols-[240px_minmax(0,1fr)_390px]"><aside className="panel h-fit p-4"><div className="flex items-center justify-between"><h2 className="section-title">版本历史</h2><span className="version-chip">{project.revisions.length} 版</span></div><div className="mt-4 space-y-2">{project.revisions.slice().reverse().map((revision) => <button type="button" key={revision.id} className={`revision-button ${revision.id === selected.id ? "revision-button-active" : ""}`} disabled={!revision.output_asset_id} onClick={() => { setSelectedId(revision.id); clearMask(); }}><span>v{revision.version} · {operationLabels[revision.operation] ?? revision.operation}</span><small>{revision.snapshot_label ?? revision.status}</small></button>)}</div><div className="mt-4 grid grid-cols-2 gap-2"><button className="secondary-button min-h-11" type="button" disabled={selectedIndex <= 0} onClick={() => setSelectedId(readyRevisions[selectedIndex - 1].id)}>撤销</button><button className="secondary-button min-h-11" type="button" disabled={selectedIndex < 0 || selectedIndex >= readyRevisions.length - 1} onClick={() => setSelectedId(readyRevisions[selectedIndex + 1].id)}>重做</button></div></aside><main className="min-w-0 space-y-5"><section className="panel p-5"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="section-title">蒙版画布</h2><p className="mt-1 text-xs text-slate-500">白色区域将交给模型修改；原图与蒙版均作为不可变输入保存。</p></div><div className="flex flex-wrap gap-2"><button type="button" className={tool === "brush" ? "primary-button" : "secondary-button"} onClick={() => setTool("brush")}>画笔</button><button type="button" className={tool === "eraser" ? "primary-button" : "secondary-button"} onClick={() => setTool("eraser")}>擦除</button><button type="button" className="secondary-button" onClick={clearMask}>清空</button></div></div><label className="mt-4 flex items-center gap-3 text-xs text-slate-400">画笔大小 <input type="range" min="8" max="180" value={brushSize} onChange={(event) => setBrushSize(Number(event.target.value))} /><span>{brushSize}px</span></label><div className="editor-canvas mt-4"><img key={sourceUrl} src={sourceUrl} alt={`v${selected.version} 编辑源图`} onLoad={(event) => initializeCanvas(event.currentTarget)} /><canvas ref={canvasRef} aria-label="编辑蒙版画布" onPointerDown={begin} onPointerMove={draw} onPointerUp={end} onPointerCancel={end} /></div></section><section className="panel p-5"><h2 className="section-title">前后对比</h2><div className="mt-4 grid gap-4 sm:grid-cols-2"><figure><img className="aspect-square w-full rounded-xl bg-white object-contain" src={originalUrl} alt="编辑项目原图" /><figcaption className="mt-2 text-xs text-slate-500">原始生成图</figcaption></figure><figure><img className="aspect-square w-full rounded-xl bg-white object-contain" src={sourceUrl} alt="当前编辑版本" /><figcaption className="mt-2 text-xs text-slate-500">当前 v{selected.version}</figcaption></figure></div>{selectedEvidence && <div className="mt-4 rounded-xl border border-white/10 p-4"><div className="flex items-center justify-between"><strong className="text-sm">编辑证据</strong><span className={selectedEvidence.automated_passed ? "status-pill" : "failure-pill"}>{selectedEvidence.automated_passed ? "自动项通过" : "阻断"}</span></div><ul className="mt-3 grid gap-2 sm:grid-cols-2">{Object.entries(selectedEvidence.checks).map(([code, passed]) => <li className="text-xs text-slate-400" key={code}>{passed ? "●" : "×"} {evidenceLabels[code] ?? code}</li>)}</ul>{selected.batch_id && <a className="secondary-button mt-4 min-h-11 w-full" href={`/batches/${selected.batch_id}`}>进入人工审核</a>}</div>}</section></main><aside className="space-y-5"><section className="panel p-5"><h2 className="section-title">AI 局部编辑</h2><form className="form-grid mt-5" onSubmit={submitAi}><div><label className="field-label mb-2" htmlFor="edit-operation">编辑动作</label><select className="field" id="edit-operation" value={operation} onChange={(event) => setOperation(event.target.value)}><option value="replace">局部替换</option><option value="remove">局部消除</option><option value="replace_background">更换背景</option><option value="outpaint">扩图</option><option value="remove_background">自动抠背景</option></select></div><div><label className="field-label mb-2" htmlFor="edit-model">编辑模型</label><select className="field" id="edit-model" name="model_configuration_id" required>{eligibleModels.map((model) => <option value={model.id} key={model.id}>{model.name} · {requiredCapability}</option>)}</select></div><div><label className="field-label mb-2" htmlFor="edit-prompt">修改要求</label><textarea className="field min-h-24" id="edit-prompt" name="prompt" required placeholder="只修改蒙版区域，并保持商品主体一致" /></div><div className="grid grid-cols-2 gap-3"><label className="text-xs text-slate-400">膨胀 px<input className="field mt-2" name="mask_dilation" type="number" min="0" max="32" defaultValue="4" /></label><label className="text-xs text-slate-400">羽化 px<input className="field mt-2" name="mask_feather" type="number" min="0" max="32" defaultValue="3" /></label></div><label className="flex min-h-11 items-center gap-3 text-sm text-slate-300"><input type="checkbox" name="invert_mask" />反选蒙版</label>{operation === "outpaint" && <div className="grid grid-cols-2 gap-3"><label className="text-xs text-slate-400">画布宽<input className="field mt-2" name="canvas_width" type="number" min="64" max="4096" defaultValue="1280" /></label><label className="text-xs text-slate-400">画布高<input className="field mt-2" name="canvas_height" type="number" min="64" max="4096" defaultValue="1280" /></label></div>}<input className="field" name="snapshot_label" placeholder="版本备注（可选）" />{!eligibleModels.length && <p className="failure-note">没有支持 {requiredCapability} 的启用模型，请先在模型中心配置能力。</p>}<button className="primary-button min-h-11" disabled={busy || !eligibleModels.length}>{busy ? "处理中…" : "生成编辑版本"}</button></form></section><section className="panel p-5"><h2 className="section-title">版式与确定性图层</h2><form className="form-grid mt-5" onSubmit={submitCompose}><div className="grid grid-cols-2 gap-3"><label className="text-xs text-slate-400">画布宽<input className="field mt-2" name="compose_width" type="number" min="64" max="4096" defaultValue="1024" /></label><label className="text-xs text-slate-400">画布高<input className="field mt-2" name="compose_height" type="number" min="64" max="4096" defaultValue="1024" /></label><label className="text-xs text-slate-400">X<input className="field mt-2" name="x" type="number" defaultValue="0" /></label><label className="text-xs text-slate-400">Y<input className="field mt-2" name="y" type="number" defaultValue="0" /></label><label className="text-xs text-slate-400">缩放<input className="field mt-2" name="scale" type="number" min="0.1" max="4" step="0.1" defaultValue="1" /></label><label className="text-xs text-slate-400">旋转 °<input className="field mt-2" name="rotation" type="number" min="-180" max="180" defaultValue="0" /></label><label className="text-xs text-slate-400">背景模糊<input className="field mt-2" name="background_blur" type="number" min="0" max="32" defaultValue="0" /></label><label className="text-xs text-slate-400">背景色<input className="field mt-2 h-11" name="background_color" type="color" defaultValue="#ffffff" /></label></div><div><label className="field-label mb-2" htmlFor="layer-text">权威文字图层</label><input className="field" id="layer-text" name="text" placeholder="标题、卖点、参数或价格" /></div><div className="grid grid-cols-2 gap-3"><input className="field" name="text_x" type="number" defaultValue="40" aria-label="文字左边界" /><input className="field" name="text_y" type="number" defaultValue="40" aria-label="文字上边界" /><input className="field" name="text_right" type="number" defaultValue="984" aria-label="文字右边界" /><input className="field" name="text_bottom" type="number" defaultValue="180" aria-label="文字下边界" /><input className="field" name="font_size" type="number" defaultValue="48" aria-label="字号" /><input className="field h-11" name="text_color" type="color" defaultValue="#16181d" aria-label="文字颜色" /></div><div><label className="field-label mb-2" htmlFor="logo-layer">Logo 图层</label><input className="field" id="logo-layer" name="logo" type="file" accept="image/png,image/jpeg,image/webp" /></div><div className="grid grid-cols-2 gap-3"><input className="field" name="logo_x" type="number" defaultValue="24" aria-label="Logo X" /><input className="field" name="logo_y" type="number" defaultValue="24" aria-label="Logo Y" /><input className="field" name="logo_width" type="number" defaultValue="180" aria-label="Logo 宽度" /><input className="field" name="logo_opacity" type="number" min="0" max="1" step="0.1" defaultValue="1" aria-label="Logo 透明度" /></div><input className="field" name="compose_label" placeholder="版本备注（可选）" /><button className="secondary-button min-h-11" disabled={busy}>保存版式新版本</button></form></section><p className="min-h-5 px-2 text-sm text-slate-300" role="status" aria-live="polite">{message}</p></aside></div>;
+}

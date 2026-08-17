@@ -3,6 +3,7 @@ from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from aiimage.api.dependencies import get_session
@@ -46,6 +47,22 @@ async def create_project_endpoint(
     except EditValidationError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
     return await project_response(session, project)
+
+
+@router.get("", response_model=list[EditProjectResponse])
+async def list_projects_endpoint(
+    user: EditUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> list[EditProjectResponse]:
+    del user
+    projects = list(
+        (
+            await session.scalars(
+                select(EditProject).order_by(EditProject.created_at.desc())
+            )
+        ).all()
+    )
+    return [await project_response(session, project) for project in projects]
 
 
 @router.post("/{project_id}/revisions/ai", response_model=EditRevisionResponse, status_code=201)
