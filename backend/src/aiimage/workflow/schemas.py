@@ -28,7 +28,7 @@ class BatchResponse(BaseModel):
     edit_revision_id: UUID | None = None
     product_id: UUID
     model_configuration_id: UUID
-    requested_view: ReferenceView
+    requested_view: ReferenceView | Literal["edit"]
     capability: str = "reference_to_image"
     mode: str
     status: BatchStatus

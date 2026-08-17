@@ -2,6 +2,8 @@
 
 **Goal:** Let an operator branch any generated image into an auditable edit project, perform masked AI edits or deterministic layout/text edits, compare immutable revisions, and send each result through quality evidence and human review.
 
+**Implementation status:** Completed on `feat/m4-single-image-editor`. Verification covers Ruff, 61 backend tests, 8 frontend tests, lint, production build, healthy Docker Compose services, and M1–M4 Playwright flows. Real-provider visual-quality gates remain open.
+
 **Architecture:** Add an `editing` domain containing edit projects, immutable revisions, masks, layers, and evidence. AI operations (`inpaint`, `outpaint`, `remove_background`) reuse the existing durable generation batch/step/worker pipeline with the exact source and processed mask assets in the snapshot. Deterministic transforms and authoritative text/logo layers create derived assets server-side without a model call. Every revision points to its parent and never overwrites an asset.
 
 **Scope:**

@@ -14,4 +14,6 @@ it("lets operators advertise fashion generation capabilities", async () => {
   await userEvent.click(screen.getByRole("checkbox", { name: "虚拟试穿" }));
   expect(screen.getByRole("checkbox", { name: "模特多角度" })).toBeChecked();
   expect(screen.getByRole("checkbox", { name: "虚拟试穿" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "局部重绘 / 消除" })).not.toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "扩图" })).not.toBeChecked();
 });

@@ -14,6 +14,7 @@ from aiimage.editing.service import (
 )
 from aiimage.models.models import ModelConfiguration
 from aiimage.workflow.models import GenerationBatch, GenerationStep
+from aiimage.workflow.schemas import BatchDetailResponse
 from aiimage.workflow.state import BatchStatus, StepStatus
 
 
@@ -193,3 +194,19 @@ async def test_composed_revision_creates_derived_asset_evidence_and_review_batch
         assert revision.status == "ready"
         assert evidence.automated_passed
         assert edit_batch.status == BatchStatus.REVIEW_PENDING.value
+
+
+def test_batch_response_accepts_edit_view() -> None:
+    response = BatchDetailResponse(
+        id="00000000-0000-0000-0000-000000000001",
+        product_id="00000000-0000-0000-0000-000000000002",
+        model_configuration_id="00000000-0000-0000-0000-000000000003",
+        requested_view="edit",
+        capability="inpaint",
+        mode="strict",
+        status=BatchStatus.REVIEW_PENDING,
+        prompt="edit",
+        width=1024,
+        height=1024,
+    )
+    assert response.requested_view == "edit"
