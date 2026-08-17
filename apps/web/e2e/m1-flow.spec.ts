@@ -18,7 +18,7 @@ test("operator creates, generates, approves, and exports one SKU", async ({ page
   await page.getByLabel("SKU").fill(`E2E-${suffix}`);
   await page.getByLabel("商品名称").fill("E2E 测试连衣裙");
   await page.getByRole("button", { name: "创建商品" }).click();
-  await expect(page.getByText("E2E 测试连衣裙")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "E2E 测试连衣裙" })).toBeVisible();
   const png = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl2nF8AAAAASUVORK5CYII=", "base64");
   await page.locator('input[type="file"]').setInputFiles({ name: "front.png", mimeType: "image/png", buffer: png });
   await page.getByRole("button", { name: "上传参考图" }).click();
