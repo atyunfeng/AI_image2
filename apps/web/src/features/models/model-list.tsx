@@ -1,0 +1,2 @@
+import { ModelConfiguration } from "@/lib/types";
+export function ModelList({models}:{models:ModelConfiguration[]}){if(!models.length)return <p className="empty-copy">还没有模型配置。</p>;return <div className="space-y-3">{models.map(m=><div className="row-card" key={m.id}><div><p className="font-semibold">{m.name}</p><p className="text-xs text-slate-500">{m.provider} / {m.model_id}</p></div><span className="text-sm text-slate-400">{m.has_key?`••••${m.key_suffix}`:"无需密钥"}</span><span className="status-pill">{m.is_enabled?"可用":"停用"}</span></div>)}</div>;}

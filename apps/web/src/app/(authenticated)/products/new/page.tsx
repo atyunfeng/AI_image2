@@ -1,0 +1,1 @@
+import{ProductForm}from"@/features/products/product-form";export default function NewProductPage(){return <div className="mx-auto max-w-2xl space-y-7"><div><p className="eyebrow">NEW PRODUCT</p><h1 className="page-title">建立商品真值</h1></div><section className="panel p-7"><ProductForm/></section></div>}
