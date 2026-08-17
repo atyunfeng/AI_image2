@@ -9,6 +9,8 @@ from aiimage.config import get_settings
 from aiimage.db import Base
 from aiimage.audit.models import AuditEvent  # noqa: F401
 from aiimage.auth.models import User  # noqa: F401
+from aiimage.assets.models import Asset  # noqa: F401
+from aiimage.catalog.models import Product, ProductReference, TruthAnchor  # noqa: F401
 
 
 config = context.config

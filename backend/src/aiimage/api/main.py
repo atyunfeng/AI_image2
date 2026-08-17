@@ -2,6 +2,7 @@ import uvicorn
 from fastapi import APIRouter, FastAPI
 
 from aiimage.auth.router import router as auth_router
+from aiimage.catalog.router import router as catalog_router
 
 
 def create_app() -> FastAPI:
@@ -14,6 +15,7 @@ def create_app() -> FastAPI:
 
     app.include_router(router)
     app.include_router(auth_router, prefix="/api/v1")
+    app.include_router(catalog_router, prefix="/api/v1")
     return app
 
 

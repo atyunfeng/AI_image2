@@ -1,0 +1,2 @@
+"""Immutable asset storage package."""
+
