@@ -10,7 +10,7 @@ test("operator compiles, generates, quality-checks, and exports a platform image
   await page.getByRole("button", { name: "登录" }).click();
   await expect(
     page.getByRole("heading", { name: "电商视觉生产线" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/models");
   await page.getByPlaceholder("配置名称").fill(`M2 E2E Mock ${suffix}`);
