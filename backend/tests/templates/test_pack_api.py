@@ -6,7 +6,7 @@ async def test_list_packs_seeds_immutable_first_party_versions(operator_client) 
     response = await operator_client.get("/api/v1/template-packs")
     assert response.status_code == 200
     body = response.json()
-    assert len(body) == 5
+    assert len(body) == 13
     amazon = next(pack for pack in body if pack["slug"] == "amazon-global")
     assert amazon["version"] == 1
     assert amazon["status"] == "published"

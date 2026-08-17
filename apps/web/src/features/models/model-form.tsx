@@ -64,9 +64,9 @@ export function ModelForm() {
   }
 
   return <form onSubmit={submit} className="form-grid" aria-busy={busy}>
-    <div><label className="field-label mb-2" htmlFor="model-name">配置名称</label><input className="field" id="model-name" name="name" required /></div>
+    <div><label className="field-label mb-2" htmlFor="model-name">配置名称</label><input className="field" id="model-name" name="name" placeholder="配置名称" required /></div>
     <div><label className="field-label mb-2" htmlFor="provider">服务类型</label><select className="field" id="provider" name="provider" value={provider} onChange={(event) => setProvider(event.target.value)}><option value="mock">Mock（本地验收）</option><option value="generic_http">通用 HTTP API</option><option value="comfyui">本地 ComfyUI 节点</option></select></div>
-    <div><label className="field-label mb-2" htmlFor="model-id">模型 ID / 工作流名</label><input className="field" id="model-id" name="model_id" required /></div>
+    <div><label className="field-label mb-2" htmlFor="model-id">模型 ID / 工作流名</label><input className="field" id="model-id" name="model_id" placeholder="模型 ID" required /></div>
     <div className="grid grid-cols-[1fr_110px] gap-3"><div><label className="field-label mb-2" htmlFor="base-url">API Base URL</label><input className="field" id="base-url" name="base_url" placeholder={provider === "comfyui" ? "http://host.docker.internal:8188" : "Mock 可留空"} /></div><div><label className="field-label mb-2" htmlFor="billing-currency">成本币种</label><input className="field uppercase" id="billing-currency" name="billing_currency" defaultValue="USD" pattern="[A-Za-z]{3}" maxLength={3} required /></div></div>
     <div><label className="field-label mb-2" htmlFor="api-key">API KEY</label><input className="field" id="api-key" name="api_key" type="password" autoComplete="new-password" placeholder={provider === "comfyui" ? "本地节点无鉴权可留空" : "加密保存"} /></div>
     {provider === "comfyui" && <div><label className="field-label mb-2" htmlFor="provider-options">ComfyUI 工作流参数</label><textarea className="field min-h-64 font-mono text-xs" id="provider-options" name="provider_options" defaultValue={comfyExample} /><p className="mt-2 text-xs leading-5 text-slate-500">粘贴 API format 工作流，并用 bindings 指定提示词、尺寸、参考图和输出节点。工作流不含 API KEY。</p></div>}
