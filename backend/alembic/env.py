@@ -13,6 +13,7 @@ from aiimage.db import Base
 from aiimage.models.models import ModelConfiguration  # noqa: F401
 from aiimage.quality.models import QualityCheck, QualityRun  # noqa: F401
 from aiimage.review.models import ReviewDecision  # noqa: F401
+from aiimage.talent.models import ModelProfile, ModelReference  # noqa: F401
 from aiimage.templates.models import (  # noqa: F401
     ProductionPlan,
     ProductionPlanItem,
