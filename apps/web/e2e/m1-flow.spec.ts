@@ -6,7 +6,7 @@ test("operator creates, generates, approves, and exports one SKU", async ({ page
   await page.getByLabel("邮箱").fill("admin@aiimage.local");
   await page.getByLabel("密码").fill("LocalOnly-ChangeMe-2026");
   await page.getByRole("button", { name: "登录" }).click();
-  await expect(page.getByText("电商视觉生产线")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "电商视觉生产线" })).toBeVisible();
 
   await page.goto("/models");
   await page.getByPlaceholder("配置名称").fill(`E2E Mock ${suffix}`);
