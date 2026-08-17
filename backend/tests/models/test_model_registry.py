@@ -5,6 +5,7 @@ async def test_api_key_is_write_only(admin_client) -> None:
             "name": "Mock Image",
             "provider": "mock",
             "model_id": "mock-v1",
+            "billing_currency": "cny",
             "api_key": "secret-provider-key",
             "capabilities": ["reference_to_image"],
         },
@@ -14,4 +15,4 @@ async def test_api_key_is_write_only(admin_client) -> None:
     assert "secret-provider-key" not in response.text
     assert response.json()["key_suffix"] == "-key"
     assert response.json()["has_key"] is True
-
+    assert response.json()["billing_currency"] == "CNY"

@@ -14,6 +14,7 @@ def to_response(configuration: ModelConfiguration) -> ModelResponse:
         provider=configuration.provider,
         model_id=configuration.model_id,
         base_url=configuration.base_url,
+        billing_currency=configuration.billing_currency,
         capabilities=configuration.capabilities,
         has_key=configuration.encrypted_api_key is not None,
         key_suffix=configuration.key_suffix,
@@ -39,6 +40,7 @@ async def create_model_configuration(
         provider=payload.provider,
         model_id=payload.model_id,
         base_url=payload.base_url,
+        billing_currency=payload.billing_currency,
         capabilities=sorted(capability.value for capability in payload.capabilities),
         encrypted_api_key=ciphertext,
         api_key_nonce=nonce,
@@ -49,4 +51,3 @@ async def create_model_configuration(
     await session.commit()
     await session.refresh(configuration)
     return configuration
-
