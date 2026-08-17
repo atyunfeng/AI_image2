@@ -178,7 +178,7 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
     except StructuralQAError as exc:
         await _mark_failed(step_id, str(exc), context)
         return False
-    except Exception:
+    except Exception:  # noqa: BLE001 - provider adapters are an external failure boundary
         await _mark_failed(step_id, "provider_error", context)
         return False
 
