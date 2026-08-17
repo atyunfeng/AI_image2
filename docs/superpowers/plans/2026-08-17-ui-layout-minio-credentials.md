@@ -170,6 +170,6 @@ Expected: no newly introduced high-confidence UI violations.
 
 Use Playwright with Microsoft Edge to log in to `http://localhost:9001` with the documented local root account and assert the URL ends in `/browser`.
 
-- [ ] **Step 4: Commit, merge and verify main**
+- [x] **Step 4: Commit, merge and verify main**
 
 Commit the feature branch, merge it into `main`, rerun the targeted layout test and Compose validation from `main`, then push only when a configured remote is available.
