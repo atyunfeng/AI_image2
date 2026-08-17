@@ -1,0 +1,2 @@
+import Link from"next/link";import{Batch}from"@/lib/types";import{BatchStatus}from"./batch-status";
+export function BatchList({batches}:{batches:Batch[]}){if(!batches.length)return <p className="empty-copy">还没有生成批次。</p>;return <div className="space-y-3">{batches.map(batch=><Link className="row-card" href={`/batches/${batch.id}`} key={batch.id}><span className="font-mono text-xs text-slate-500">{batch.id.slice(0,8)}</span><span>{batch.requested_view} · {batch.width}×{batch.height}</span><BatchStatus status={batch.status}/></Link>)}</div>}

@@ -1,0 +1,2 @@
+import Link from"next/link";import{BatchList}from"@/features/batches/batch-list";import{safeApiFetch}from"@/lib/api-client";import{Batch}from"@/lib/types";
+export default async function BatchesPage(){const batches=await safeApiFetch<Batch[]>("/batches",[]);return <div className="space-y-7"><div className="flex items-end justify-between"><div><p className="eyebrow">GENERATION QUEUE</p><h1 className="page-title">生成批次</h1></div><Link href="/batches/new" className="primary-button">新建批次</Link></div><section className="panel p-6"><BatchList batches={batches}/></section></div>}
