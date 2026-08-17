@@ -14,10 +14,17 @@ from aiimage.assets.storage import ObjectStore
 from aiimage.auth.models import User  # noqa: F401 - registers worker foreign-key metadata
 from aiimage.catalog.models import ProductReference
 from aiimage.composition.service import create_composed_asset
+from aiimage.fashion.evidence import create_fashion_evidence
+from aiimage.fashion.models import FashionPlan  # noqa: F401 - registers worker metadata
 from aiimage.models.domain import Capability, GenerationRequest, ReferenceImage
 from aiimage.models.models import ModelConfiguration
 from aiimage.providers.registry import ProviderRegistry
 from aiimage.quality.service import run_structural_quality
+from aiimage.talent.models import (
+    ModelProfile,
+    ModelReference,
+)
+from aiimage.talent.service import authorization_is_current
 from aiimage.templates.models import (  # noqa: F401 - registers worker foreign-key metadata
     ProductionPlan,
     ProductionPlanItem,
@@ -111,38 +118,62 @@ async def _lease_step(
 async def _load_references(
     batch: GenerationBatch,
     context: WorkerContext,
-) -> list[ReferenceImage]:
-    reference_ids = [UUID(value) for value in batch.input_snapshot.get("reference_ids", [])]
-    if not reference_ids:
-        return []
+) -> tuple[list[ReferenceImage], list[ReferenceImage]]:
+    product_reference_ids = [
+        UUID(value) for value in batch.input_snapshot.get("reference_ids", [])
+    ]
+    model_reference_ids = [
+        UUID(value) for value in batch.input_snapshot.get("model_reference_ids", [])
+    ]
     async with context.session_factory() as session:
-        references = list(
+        product_references = list(
             (
                 await session.scalars(
-                    select(ProductReference).where(ProductReference.id.in_(reference_ids))
-                )
-            ).all()
-        )
-        assets = {
-            asset.id: asset
-            for asset in (
-                await session.scalars(
-                    select(Asset).where(
-                        Asset.id.in_([reference.asset_id for reference in references])
+                    select(ProductReference).where(
+                        ProductReference.id.in_(product_reference_ids)
                     )
                 )
             ).all()
-        }
-    images = []
-    for reference in references:
-        asset = assets[reference.asset_id]
-        images.append(
-            ReferenceImage(
-                content=await context.object_store.get(object_key=asset.object_key),
-                mime_type=asset.mime_type,
-            )
         )
-    return images
+        model_references = list(
+            (
+                await session.scalars(
+                    select(ModelReference).where(ModelReference.id.in_(model_reference_ids))
+                )
+            ).all()
+        )
+        asset_ids = [
+            reference.asset_id for reference in [*product_references, *model_references]
+        ]
+        assets = {
+            asset.id: asset
+            for asset in (
+                await session.scalars(select(Asset).where(Asset.id.in_(asset_ids)))
+            ).all()
+        }
+    async def images_for(references) -> list[ReferenceImage]:
+        images = []
+        for reference in references:
+            asset = assets[reference.asset_id]
+            images.append(
+                ReferenceImage(
+                    content=await context.object_store.get(object_key=asset.object_key),
+                    mime_type=asset.mime_type,
+                )
+            )
+        return images
+
+    return await images_for(product_references), await images_for(model_references)
+
+
+async def _fashion_authorization_is_current(
+    batch: GenerationBatch, context: WorkerContext
+) -> bool:
+    if batch.model_profile_id is None:
+        return True
+    async with context.session_factory() as session:
+        profile = await session.get(ModelProfile, batch.model_profile_id)
+        return profile is not None and authorization_is_current(profile)
 
 
 async def _mark_failed(step_id: UUID, classification: str, context: WorkerContext) -> None:
@@ -166,20 +197,27 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         return False
     step, batch, configuration = leased
     try:
-        references = await _load_references(batch, context)
+        if not await _fashion_authorization_is_current(batch, context):
+            await _mark_failed(step_id, "model_authorization_expired", context)
+            return False
+        product_references, model_references = await _load_references(batch, context)
         provider = context.provider_registry.get(configuration)
         result = await provider.generate(
             GenerationRequest(
                 idempotency_key=step.idempotency_key,
-                capability=Capability.REFERENCE_TO_IMAGE,
+                capability=Capability(batch.capability),
                 prompt=batch.prompt,
-                reference_images=references,
+                reference_images=[*product_references, *model_references],
                 width=batch.width,
                 height=batch.height,
                 parameters={
                     "requested_view": batch.requested_view,
                     "mode": batch.mode,
                     "background": batch.input_snapshot.get("slot_rules", {}).get("background"),
+                    "fashion_output": batch.input_snapshot.get("fashion_output"),
+                    "product_reference_count": len(product_references),
+                    "model_reference_count": len(model_references),
+                    "inferred_view": batch.input_snapshot.get("inferred_view", False),
                 },
             )
         )
@@ -231,7 +269,19 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         if current_batch is not None:
             current_batch.status = BatchStatus.QA_PENDING.value
             slot_rules = current_batch.input_snapshot.get("slot_rules")
-            if slot_rules:
+            if current_batch.fashion_plan_id is not None:
+                evidence = await create_fashion_evidence(
+                    session,
+                    context.object_store,
+                    batch=current_batch,
+                    output_asset=output_asset,
+                )
+                if evidence.automated_passed:
+                    current_batch.status = BatchStatus.REVIEW_PENDING.value
+                else:
+                    current_batch.status = BatchStatus.FAILED.value
+                    current.error_classification = "fashion_evidence_blocking"
+            elif slot_rules:
                 quality_run = await run_structural_quality(
                     session,
                     context.object_store,

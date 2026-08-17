@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -35,3 +35,16 @@ class FashionPlanResponse(BaseModel):
     requested_outputs: list[FashionOutput]
     created_at: datetime
     batches: list[BatchResponse | BatchDetailResponse]
+
+
+class FashionEvidenceResponse(BaseModel):
+    id: UUID
+    batch_id: UUID
+    output_asset_id: UUID
+    capability: str
+    inferred_view: bool
+    automated_passed: bool
+    checks: dict[str, bool]
+    measured: dict[str, Any]
+    human_review_checks: list[str]
+    created_at: datetime

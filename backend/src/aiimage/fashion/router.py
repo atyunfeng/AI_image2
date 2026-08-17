@@ -8,7 +8,12 @@ from aiimage.api.dependencies import get_session
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
 from aiimage.fashion.compiler import FashionCompilationError
-from aiimage.fashion.schemas import CreateFashionPlanRequest, FashionPlanResponse
+from aiimage.fashion.evidence import latest_fashion_evidence
+from aiimage.fashion.schemas import (
+    CreateFashionPlanRequest,
+    FashionEvidenceResponse,
+    FashionPlanResponse,
+)
 from aiimage.fashion.service import create_fashion_plan, get_fashion_plan
 from aiimage.workflow.queue import QueueHints, get_queue_hints
 
@@ -40,3 +45,16 @@ async def read_fashion_plan(
     if plan is None:
         raise HTTPException(status_code=404, detail="Fashion plan not found")
     return plan
+
+
+@router.get("/batches/{batch_id}/evidence", response_model=FashionEvidenceResponse)
+async def read_fashion_evidence(
+    batch_id: UUID,
+    user: FashionUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+) -> FashionEvidenceResponse:
+    del user
+    evidence = await latest_fashion_evidence(session, batch_id)
+    if evidence is None:
+        raise HTTPException(status_code=404, detail="Fashion evidence not found")
+    return FashionEvidenceResponse.model_validate(evidence, from_attributes=True)
