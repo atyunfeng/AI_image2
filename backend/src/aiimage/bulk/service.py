@@ -345,6 +345,34 @@ async def get_bulk_job(session: AsyncSession, job_id: UUID) -> BulkJobResponse |
     return _to_response(job, rows)
 
 
-async def list_bulk_jobs(session: AsyncSession) -> list[BulkJobResponse]:
-    jobs = list((await session.scalars(select(BulkJob).order_by(BulkJob.created_at.desc()))).all())
-    return [response for job in jobs if (response := await get_bulk_job(session, job.id))]
+async def list_bulk_jobs(
+    session: AsyncSession,
+    *,
+    limit: int = 25,
+    offset: int = 0,
+) -> list[BulkJobResponse]:
+    jobs = list(
+        (
+            await session.scalars(
+                select(BulkJob)
+                .order_by(BulkJob.created_at.desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        ).all()
+    )
+    if not jobs:
+        return []
+    rows = list(
+        (
+            await session.scalars(
+                select(BulkJobRow)
+                .where(BulkJobRow.job_id.in_([job.id for job in jobs]))
+                .order_by(BulkJobRow.job_id, BulkJobRow.row_number)
+            )
+        ).all()
+    )
+    rows_by_job: dict[UUID, list[BulkJobRow]] = {job.id: [] for job in jobs}
+    for row in rows:
+        rows_by_job[row.job_id].append(row)
+    return [_to_response(job, rows_by_job[job.id]) for job in jobs]

@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -55,25 +55,31 @@ def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDeta
 async def list_batches(
     user: BatchReader,
     session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    batch_status: Annotated[str | None, Query(alias="status", max_length=30)] = None,
 ) -> list[BatchDetailResponse]:
     del user
-    batches = list(
-        (
-            await session.scalars(
-                select(GenerationBatch).order_by(GenerationBatch.created_at.desc())
-            )
-        ).all()
+    latest_step_id = (
+        select(GenerationStep.id)
+        .where(GenerationStep.batch_id == GenerationBatch.id)
+        .order_by(desc(GenerationStep.attempt_count), desc(GenerationStep.id))
+        .limit(1)
+        .correlate(GenerationBatch)
+        .scalar_subquery()
     )
-    result = []
-    for batch in batches:
-        step = await session.scalar(
-            select(GenerationStep)
-            .where(GenerationStep.batch_id == batch.id)
-            .order_by(desc(GenerationStep.attempt_count))
-            .limit(1)
+    statement = select(GenerationBatch, GenerationStep).outerjoin(
+        GenerationStep,
+        GenerationStep.id == latest_step_id,
+    )
+    if batch_status:
+        statement = statement.where(GenerationBatch.status == batch_status)
+    rows = (
+        await session.execute(
+            statement.order_by(GenerationBatch.created_at.desc()).offset(offset).limit(limit)
         )
-        result.append(_to_detail(batch, step))
-    return result
+    ).all()
+    return [_to_detail(batch, step) for batch, step in rows]
 
 
 @router.get("/{batch_id}", response_model=BatchDetailResponse)

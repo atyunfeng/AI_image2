@@ -3,7 +3,7 @@ from io import StringIO
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,10 +20,13 @@ BulkUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR))]
 
 @router.get("", response_model=list[BulkJobResponse])
 async def read_bulk_jobs(
-    user: BulkUser, session: Annotated[AsyncSession, Depends(get_session)]
+    user: BulkUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 25,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[BulkJobResponse]:
     del user
-    return await list_bulk_jobs(session)
+    return await list_bulk_jobs(session, limit=limit, offset=offset)
 
 
 @router.get("/{job_id}", response_model=BulkJobResponse)
