@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from aiimage.benchmark.report import build_report
-from aiimage.benchmark.runner import BenchmarkRunnerUnavailable, run_benchmark
+from aiimage.benchmark.runner import BenchmarkExecutionError, run_benchmark
 from aiimage.benchmark.validator import validate_manifest
 
 
@@ -16,6 +16,10 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("manifest", type=Path)
     run.add_argument("--model-configuration-id", required=True)
     run.add_argument("--results", type=Path, default=Path("benchmark-results.jsonl"))
+    run.add_argument("--api-base-url", default="http://localhost:8000/api/v1")
+    run.add_argument("--email", required=True)
+    run.add_argument("--password", required=True)
+    run.add_argument("--timeout-seconds", type=int, default=600)
     report = commands.add_parser("report", help="aggregate JSONL attempt results")
     report.add_argument("results", type=Path)
     report.add_argument("--output", type=Path, default=Path("capability-report.json"))
@@ -34,8 +38,12 @@ def main() -> None:
                 manifest_path=arguments.manifest,
                 model_configuration_id=arguments.model_configuration_id,
                 results_path=arguments.results,
+                api_base_url=arguments.api_base_url,
+                email=arguments.email,
+                password=arguments.password,
+                timeout_seconds=arguments.timeout_seconds,
             )
-        except BenchmarkRunnerUnavailable as error:
+        except BenchmarkExecutionError as error:
             raise SystemExit(str(error)) from error
     else:
         report = build_report(arguments.results)
