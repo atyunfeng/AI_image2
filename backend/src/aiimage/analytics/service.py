@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,6 +33,11 @@ def _base_statement(
     sku: str | None,
     status: str | None = None,
 ):
+    today = datetime.now(UTC).date()
+    if date_from is None:
+        date_from = today - timedelta(days=29)
+    if date_to is None:
+        date_to = today
     statement = (
         select(GenerationStep, GenerationBatch, ModelConfiguration, Product)
         .join(GenerationBatch, GenerationBatch.id == GenerationStep.batch_id)

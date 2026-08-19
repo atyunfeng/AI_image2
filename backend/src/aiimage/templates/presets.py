@@ -268,8 +268,17 @@ _SUPPORT_PACKS: tuple[dict[str, Any], ...] = (
 
 
 def first_party_platform_packs() -> list[dict[str, Any]]:
-    return deepcopy(list(_PLATFORM_PACKS))
+    packs = deepcopy(list(_PLATFORM_PACKS))
+    for pack in packs:
+        pack["rules"]["governance"] = {
+            "verification_status": "requires_official_verification",
+            "official_source_url": None,
+            "effective_from": None,
+            "reviewed_at": None,
+            "market": pack["rules"]["market"],
+        }
+    return packs
 
 
 def first_party_packs() -> list[dict[str, Any]]:
-    return deepcopy([*_PLATFORM_PACKS, *_SUPPORT_PACKS])
+    return [*first_party_platform_packs(), *deepcopy(list(_SUPPORT_PACKS))]

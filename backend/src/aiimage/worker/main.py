@@ -1,9 +1,12 @@
 import asyncio
+import os
+import socket
 from uuid import UUID
 
 from redis.asyncio import Redis
 
 from aiimage.assets.storage import get_object_store
+from aiimage.bulk.service import process_next_bulk_job
 from aiimage.config import get_settings
 from aiimage.db import get_database
 from aiimage.providers.registry import ProviderRegistry
@@ -20,18 +23,51 @@ async def run_worker() -> None:
     context = WorkerContext(
         session_factory=database.session_factory,
         object_store=get_object_store(),
-        provider_registry=ProviderRegistry(secret_key_base64=settings.secret_key_base64),
+        provider_registry=ProviderRegistry(
+            secret_key_base64=settings.secret_key_base64,
+            allow_private_urls=settings.allow_private_provider_urls,
+        ),
         max_concurrency=settings.worker_max_concurrency,
         provider_concurrency_limits=settings.provider_concurrency_limits,
+        max_attempts=settings.worker_max_attempts,
+        retry_base_seconds=settings.worker_retry_base_seconds,
     )
+    worker_id = f"{socket.gethostname()}-{os.getpid()}"
+    running: set[asyncio.Task[bool]] = set()
+    bulk_task: asyncio.Task[UUID | None] | None = None
     try:
         await recover_generation_steps(database.session_factory, queue)
         while True:
-            item = await redis.brpop(queue.queue_name, timeout=30)
+            await redis.set("aiimage:worker:heartbeat", worker_id, ex=90)
+            if len(running) >= settings.worker_max_concurrency:
+                done, running = await asyncio.wait(
+                    running,
+                    return_when=asyncio.FIRST_COMPLETED,
+                )
+                for task in done:
+                    task.result()
+            item = await redis.brpop(queue.queue_name, timeout=5)
             if item is not None:
-                await execute_step(UUID(item[1].decode()), "worker-1", context)
+                step_id = UUID(item[1].decode())
+                await queue.acknowledge(step_id)
+                running.add(asyncio.create_task(execute_step(step_id, worker_id, context)))
+            if bulk_task is None or bulk_task.done():
+                if bulk_task is not None:
+                    bulk_task.result()
+                bulk_task = asyncio.create_task(
+                    process_next_bulk_job(
+                        database.session_factory,
+                        queue,
+                        worker_id=worker_id,
+                    )
+                )
             await recover_generation_steps(database.session_factory, queue)
     finally:
+        if running:
+            await asyncio.gather(*running, return_exceptions=True)
+        if bulk_task is not None:
+            await asyncio.gather(bulk_task, return_exceptions=True)
+        await redis.delete("aiimage:worker:heartbeat")
         await redis.aclose()
         await database.dispose()
 

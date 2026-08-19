@@ -94,7 +94,7 @@ test("operator creates authorized talent, multi-angle images, virtual try-on, an
   await page.getByLabel("生图模型").selectOption(modelOption!);
   await page.getByText("模特侧面图").click();
   await page.getByRole("button", { name: "开始生成 4 张图片" }).click();
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator('p[role="status"]')).toContainText(
     "requires product reference: side",
   );
 

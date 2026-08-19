@@ -1,12 +1,13 @@
 import csv
+from datetime import UTC, datetime, timedelta
 from io import BytesIO, StringIO
 from pathlib import Path
 from uuid import UUID
 
 from openpyxl import load_workbook
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aiimage.assets.models import Asset
 from aiimage.bulk.models import BulkJob, BulkJobRow
@@ -23,6 +24,7 @@ from aiimage.models.models import ModelConfiguration
 from aiimage.templates.models import PackKind, TemplatePack, TemplatePackVersion
 from aiimage.templates.schemas import CompilePlanRequest
 from aiimage.templates.service import create_production_plan, ensure_first_party_packs
+from aiimage.workflow.models import GenerationBatch
 from aiimage.workflow.queue import QueueHints
 from aiimage.workflow.service import execute_production_plan
 
@@ -122,9 +124,7 @@ async def _validate_row(
         view = ReferenceView(row.get("reference_view") or "front")
     except ValueError as exc:
         raise BulkImportError("Unsupported category or reference_view") from exc
-    platform_version = await _pack_version_by_slug(
-        session, row["platform_slug"], PackKind.PLATFORM
-    )
+    platform_version = await _pack_version_by_slug(session, row["platform_slug"], PackKind.PLATFORM)
     if platform_version is None:
         raise BulkImportError("Unknown published platform_slug")
     product = await session.scalar(select(Product).where(Product.sku == sku))
@@ -141,7 +141,9 @@ async def _validate_row(
     if product is not None:
         has_reference = (
             await session.scalar(
-                select(ProductReference.id).where(ProductReference.product_id == product.id).limit(1)
+                select(ProductReference.id)
+                .where(ProductReference.product_id == product.id)
+                .limit(1)
             )
         ) is not None
     if not has_reference and asset is None:
@@ -166,9 +168,8 @@ def _to_response(job: BulkJob, rows: list[BulkJobRow]) -> BulkJobResponse:
     )
 
 
-async def create_bulk_job(
+async def enqueue_bulk_job(
     session: AsyncSession,
-    queue: QueueHints,
     *,
     filename: str,
     content: bytes,
@@ -197,9 +198,7 @@ async def create_bulk_job(
                 select(TemplatePackVersion.id, TemplatePack.kind)
                 .join(TemplatePack, TemplatePack.id == TemplatePackVersion.pack_id)
                 .where(
-                    TemplatePackVersion.id.in_(
-                        [category_pack_version_id, brand_pack_version_id]
-                    )
+                    TemplatePackVersion.id.in_([category_pack_version_id, brand_pack_version_id])
                 )
             )
         ).all()
@@ -208,11 +207,10 @@ async def create_bulk_job(
         raise BulkImportError("category_pack_version_id is not a category pack")
     if kinds.get(brand_pack_version_id) != PackKind.BRAND.value:
         raise BulkImportError("brand_pack_version_id is not a brand pack")
-
     job = BulkJob(
         filename=filename[:255],
         dry_run=dry_run,
-        status="validating" if dry_run else "processing",
+        status="pending",
         model_configuration_id=model_configuration_id,
         category_pack_version_id=category_pack_version_id,
         brand_pack_version_id=brand_pack_version_id,
@@ -221,112 +219,197 @@ async def create_bulk_job(
     )
     session.add(job)
     await session.flush()
-    job_id = job.id
-    await session.commit()
-    await session.refresh(job)
-    result_rows: list[BulkJobRow] = []
-    for index, row in enumerate(parsed_rows, start=2):
-        result = BulkJobRow(
-            job_id=job_id,
+    rows = [
+        BulkJobRow(
+            job_id=job.id,
             row_number=index,
             sku=row.get("sku", "").upper(),
-            status="validating",
+            status="pending",
             input_data=row,
             batch_ids=[],
         )
-        session.add(result)
-        result_rows.append(result)
-        try:
-            product, platform_version, asset, category, view = await _validate_row(session, row)
-            if dry_run:
-                result.status = "valid"
-                continue
-            if product is None:
-                product = Product(
-                    sku=row["sku"].upper(),
-                    name=row["name"],
-                    category=category.value,
-                    brand=row.get("brand") or None,
-                    created_by_user_id=user_id,
-                )
-                session.add(product)
-                await session.flush()
-                session.add(
-                    TruthAnchor(
-                        product_id=product.id,
-                        version=1,
-                        document={"source": "bulk_import", "bulk_job_id": str(job_id)},
-                        created_by_user_id=user_id,
-                    )
-                )
-            if asset is not None:
-                existing_reference = await session.scalar(
-                    select(ProductReference.id).where(
-                        ProductReference.product_id == product.id,
-                        ProductReference.asset_id == asset.id,
-                        ProductReference.view == view.value,
-                    )
-                )
-                if existing_reference is None:
-                    session.add(
-                        ProductReference(product_id=product.id, asset_id=asset.id, view=view.value)
-                    )
-            await session.commit()
-            plan = await create_production_plan(
-                session,
-                payload=CompilePlanRequest(
-                    product_id=product.id,
-                    platform_pack_version_id=platform_version.id,
-                    category_pack_version_id=category_pack_version_id,
-                    brand_pack_version_id=brand_pack_version_id,
-                    mode=row.get("mode") or "strict",
-                ),
-                user_id=user_id,
-            )
-            batches = await execute_production_plan(
-                session,
-                queue,
-                plan_id=plan.id,
-                model_configuration_id=model_configuration_id,
-                user_id=user_id,
-            )
-            result.product_id = product.id
-            result.production_plan_id = plan.id
-            result.batch_ids = [str(batch.id) for batch in batches]
-            result.status = "queued"
-        except (BulkImportError, ValueError, RuntimeError, SQLAlchemyError) as exc:
-            await session.rollback()
-            result = await session.merge(result)
-            result.status = "invalid" if dry_run else "failed"
-            result.error = str(exc)[:1000]
-        await session.commit()
+        for index, row in enumerate(parsed_rows, start=2)
+    ]
+    session.add_all(rows)
+    await session.commit()
+    await session.refresh(job)
+    return _to_response(job, rows)
 
-    job = await session.get(BulkJob, job_id)
-    assert job is not None
-    rows = list(
+
+async def _process_queued_row(
+    session: AsyncSession,
+    queue: QueueHints,
+    *,
+    job: BulkJob,
+    result: BulkJobRow,
+) -> None:
+    row = result.input_data
+    product, platform_version, asset, category, view = await _validate_row(session, row)
+    if job.dry_run:
+        result.status = "valid"
+        await session.commit()
+        return
+    if product is None:
+        product = Product(
+            sku=row["sku"].upper(),
+            name=row["name"],
+            category=category.value,
+            brand=row.get("brand") or None,
+            created_by_user_id=job.created_by_user_id,
+        )
+        session.add(product)
+        await session.flush()
+        session.add(
+            TruthAnchor(
+                product_id=product.id,
+                version=1,
+                document={"source": "bulk_import", "bulk_job_id": str(job.id)},
+                created_by_user_id=job.created_by_user_id,
+            )
+        )
+    if asset is not None:
+        existing_reference = await session.scalar(
+            select(ProductReference.id).where(
+                ProductReference.product_id == product.id,
+                ProductReference.asset_id == asset.id,
+                ProductReference.view == view.value,
+            )
+        )
+        if existing_reference is None:
+            session.add(ProductReference(product_id=product.id, asset_id=asset.id, view=view.value))
+    result.product_id = product.id
+    await session.commit()
+    if result.production_plan_id is None:
+        plan = await create_production_plan(
+            session,
+            payload=CompilePlanRequest(
+                product_id=product.id,
+                platform_pack_version_id=platform_version.id,
+                category_pack_version_id=job.category_pack_version_id,
+                brand_pack_version_id=job.brand_pack_version_id,
+                mode=row.get("mode") or "strict",
+            ),
+            user_id=job.created_by_user_id,
+        )
+        result = await session.get(BulkJobRow, result.id)
+        assert result is not None
+        result.production_plan_id = plan.id
+        await session.commit()
+    batches = list(
         (
             await session.scalars(
-                select(BulkJobRow)
-                .where(BulkJobRow.job_id == job.id)
-                .order_by(BulkJobRow.row_number)
+                select(GenerationBatch).where(
+                    GenerationBatch.production_plan_id == result.production_plan_id
+                )
             )
         ).all()
     )
-    job.succeeded_rows = sum(row.status in {"valid", "queued"} for row in rows)
-    job.failed_rows = len(rows) - job.succeeded_rows
-    job.status = (
-        "validated"
-        if dry_run and not job.failed_rows
-        else "validation_failed"
-        if dry_run
-        else "queued"
-        if not job.failed_rows
-        else "partially_queued"
-        if job.succeeded_rows
-        else "failed"
-    )
+    if not batches:
+        batches = await execute_production_plan(
+            session,
+            queue,
+            plan_id=result.production_plan_id,
+            model_configuration_id=job.model_configuration_id,
+            user_id=job.created_by_user_id,
+        )
+    result = await session.get(BulkJobRow, result.id)
+    assert result is not None
+    result.batch_ids = [str(batch.id) for batch in batches]
+    result.status = "queued"
     await session.commit()
-    return _to_response(job, rows)
+
+
+async def process_next_bulk_job(
+    session_factory: async_sessionmaker[AsyncSession],
+    queue: QueueHints,
+    *,
+    worker_id: str,
+    lease_seconds: int = 300,
+) -> UUID | None:
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        job = await session.scalar(
+            select(BulkJob)
+            .where(
+                or_(
+                    BulkJob.status == "pending",
+                    (BulkJob.status == "processing")
+                    & or_(BulkJob.lease_expires_at.is_(None), BulkJob.lease_expires_at <= now),
+                )
+            )
+            .order_by(BulkJob.created_at)
+            .with_for_update(skip_locked=True)
+            .limit(1)
+        )
+        if job is None:
+            return None
+        job.status = "processing"
+        job.lease_owner = worker_id
+        job.lease_expires_at = now + timedelta(seconds=lease_seconds)
+        await session.commit()
+        job_id = job.id
+
+    async with session_factory() as session:
+        job = await session.get(BulkJob, job_id)
+        assert job is not None
+        rows = list(
+            (
+                await session.scalars(
+                    select(BulkJobRow)
+                    .where(
+                        BulkJobRow.job_id == job.id,
+                        BulkJobRow.status.in_(["pending", "processing"]),
+                    )
+                    .order_by(BulkJobRow.row_number)
+                )
+            ).all()
+        )
+        row_ids = [result.id for result in rows]
+        for result_id in row_ids:
+            job = await session.get(BulkJob, job_id)
+            result = await session.get(BulkJobRow, result_id)
+            assert job is not None and result is not None
+            dry_run = job.dry_run
+            result.status = "processing"
+            job.lease_expires_at = datetime.now(UTC) + timedelta(seconds=lease_seconds)
+            await session.commit()
+            try:
+                await _process_queued_row(session, queue, job=job, result=result)
+            except (BulkImportError, ValueError, RuntimeError, SQLAlchemyError) as exc:
+                await session.rollback()
+                result = await session.get(BulkJobRow, result_id)
+                assert result is not None
+                result.status = "invalid" if dry_run else "failed"
+                result.error = str(exc)[:1000]
+                await session.commit()
+        rows = list(
+            (
+                await session.scalars(
+                    select(BulkJobRow)
+                    .where(BulkJobRow.job_id == job_id)
+                    .order_by(BulkJobRow.row_number)
+                )
+            ).all()
+        )
+        job = await session.get(BulkJob, job_id)
+        assert job is not None
+        job.succeeded_rows = sum(row.status in {"valid", "queued"} for row in rows)
+        job.failed_rows = len(rows) - job.succeeded_rows
+        job.status = (
+            "validated"
+            if job.dry_run and not job.failed_rows
+            else "validation_failed"
+            if job.dry_run
+            else "queued"
+            if not job.failed_rows
+            else "partially_queued"
+            if job.succeeded_rows
+            else "failed"
+        )
+        job.lease_owner = None
+        job.lease_expires_at = None
+        await session.commit()
+    return job_id
 
 
 async def get_bulk_job(session: AsyncSession, job_id: UUID) -> BulkJobResponse | None:
@@ -345,6 +428,31 @@ async def get_bulk_job(session: AsyncSession, job_id: UUID) -> BulkJobResponse |
     return _to_response(job, rows)
 
 
-async def list_bulk_jobs(session: AsyncSession) -> list[BulkJobResponse]:
-    jobs = list((await session.scalars(select(BulkJob).order_by(BulkJob.created_at.desc()))).all())
-    return [response for job in jobs if (response := await get_bulk_job(session, job.id))]
+async def list_bulk_jobs(
+    session: AsyncSession,
+    *,
+    limit: int = 25,
+    offset: int = 0,
+) -> list[BulkJobResponse]:
+    jobs = list(
+        (
+            await session.scalars(
+                select(BulkJob).order_by(BulkJob.created_at.desc()).offset(offset).limit(limit)
+            )
+        ).all()
+    )
+    if not jobs:
+        return []
+    rows = list(
+        (
+            await session.scalars(
+                select(BulkJobRow)
+                .where(BulkJobRow.job_id.in_([job.id for job in jobs]))
+                .order_by(BulkJobRow.job_id, BulkJobRow.row_number)
+            )
+        ).all()
+    )
+    rows_by_job: dict[UUID, list[BulkJobRow]] = {job.id: [] for job in jobs}
+    for row in rows:
+        rows_by_job[row.job_id].append(row)
+    return [_to_response(job, rows_by_job[job.id]) for job in jobs]

@@ -9,9 +9,15 @@ from aiimage.assets.storage import ObjectStore, get_object_store
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
 from aiimage.export.schemas import ExportRecordResponse
-from aiimage.export.service import ExportConflictError, build_export_zip, list_export_records
+from aiimage.export.service import (
+    ExportConflictError,
+    build_export_zip,
+    build_production_plan_export_zip,
+    list_export_records,
+)
 
 router = APIRouter(prefix="/batches", tags=["export"])
+plan_export_router = APIRouter(prefix="/production-plans", tags=["export"])
 ExportUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR, Role.REVIEWER))]
 
 
@@ -46,3 +52,28 @@ async def export_history_endpoint(
         ExportRecordResponse.model_validate(record)
         for record in await list_export_records(session, batch_id)
     ]
+
+
+@plan_export_router.get("/{plan_id}/export.zip")
+async def export_production_plan_endpoint(
+    plan_id: UUID,
+    user: ExportUser,
+    session: Annotated[AsyncSession, Depends(get_session)],
+    store: Annotated[ObjectStore, Depends(get_object_store)],
+) -> Response:
+    try:
+        content = await build_production_plan_export_zip(
+            session,
+            store,
+            plan_id=plan_id,
+            user_id=user.id,
+        )
+    except LookupError as error:
+        raise HTTPException(status_code=404, detail="Production plan not found") from error
+    except ExportConflictError as error:
+        raise HTTPException(status_code=409, detail=str(error)) from error
+    return Response(
+        content=content,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="production-{plan_id}.zip"'},
+    )

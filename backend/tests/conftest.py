@@ -94,6 +94,34 @@ async def operator_client(session_factory) -> AsyncIterator[AsyncClient]:
 
 
 @pytest_asyncio.fixture
+async def reviewer_client(session_factory) -> AsyncIterator[AsyncClient]:
+    async with session_factory() as session:
+        reviewer = await create_user(
+            session,
+            email="reviewer@aiimage.local",
+            password="Reviewer-Password-2026",
+            roles={Role.REVIEWER},
+        )
+        await session.commit()
+        token = create_access_token(reviewer, secret=get_settings().jwt_secret)
+
+    async def override_session() -> AsyncIterator[AsyncSession]:
+        async with session_factory() as session:
+            yield session
+
+    app = create_app()
+    app.dependency_overrides[get_session] = override_session
+    app.dependency_overrides[get_object_store] = InMemoryObjectStore
+    transport = ASGITransport(app=app)
+    async with AsyncClient(
+        transport=transport,
+        base_url="http://test",
+        headers={"Authorization": f"Bearer {token}"},
+    ) as client:
+        yield client
+
+
+@pytest_asyncio.fixture
 async def admin_client(session_factory) -> AsyncIterator[AsyncClient]:
     async with session_factory() as session:
         admin = await create_user(

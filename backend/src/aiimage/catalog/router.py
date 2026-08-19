@@ -1,7 +1,17 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile, status
+from fastapi import (
+    APIRouter,
+    Depends,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    Response,
+    UploadFile,
+    status,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -42,14 +52,21 @@ CatalogUser = Annotated[
 async def list_products(
     user: CatalogUser,
     session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
+    query: Annotated[str | None, Query(max_length=100)] = None,
 ) -> list[ProductResponse]:
     del user
+    statement = select(Product).where(Product.archived_at.is_(None))
+    if query:
+        normalized = f"%{query.strip()}%"
+        statement = statement.where(
+            Product.sku.ilike(normalized) | Product.name.ilike(normalized)
+        )
     products = list(
         (
             await session.scalars(
-                select(Product)
-                .where(Product.archived_at.is_(None))
-                .order_by(Product.created_at.desc())
+                statement.order_by(Product.created_at.desc()).offset(offset).limit(limit)
             )
         ).all()
     )

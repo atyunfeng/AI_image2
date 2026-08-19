@@ -82,3 +82,56 @@ async def test_recovers_queued_and_expired_steps(session_factory) -> None:
         expired = await session.get(GenerationStep, expired_id)
         assert expired.status == StepStatus.RETRY_QUEUED.value
         assert expired.lease_owner is None
+
+
+@pytest.mark.asyncio
+async def test_recovery_skips_retry_before_next_attempt(session_factory) -> None:
+    now = datetime.now(UTC)
+    async with session_factory() as session:
+        user = await create_user(
+            session,
+            email=f"scheduled-{uuid4()}@aiimage.local",
+            password="Worker-Password-2026",
+            roles={Role.OPERATOR},
+        )
+        product = Product(
+            sku=f"SCHEDULED-{uuid4()}",
+            name="Scheduled retry",
+            category="hats",
+            created_by_user_id=user.id,
+        )
+        model = ModelConfiguration(
+            name=f"scheduled-model-{uuid4()}",
+            provider="mock",
+            model_id="mock-v1",
+            capabilities=[Capability.REFERENCE_TO_IMAGE.value],
+            created_by_user_id=user.id,
+        )
+        session.add_all([product, model])
+        await session.flush()
+        batch = GenerationBatch(
+            product_id=product.id,
+            model_configuration_id=model.id,
+            requested_view="front",
+            mode="strict",
+            prompt="test",
+            width=64,
+            height=64,
+            status=BatchStatus.RETRY_QUEUED.value,
+            input_snapshot={},
+            created_by_user_id=user.id,
+        )
+        session.add(batch)
+        await session.flush()
+        step = GenerationStep(
+            batch_id=batch.id,
+            idempotency_key=f"scheduled-{uuid4()}",
+            status=StepStatus.RETRY_QUEUED.value,
+            next_attempt_at=now + timedelta(minutes=1),
+        )
+        session.add(step)
+        await session.commit()
+
+    queue = RecordingQueue()
+    assert await recover_generation_steps(session_factory, queue, now=now) == []
+    assert queue.published == []

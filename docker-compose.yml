@@ -62,6 +62,11 @@ services:
       AIIMAGE_BOOTSTRAP_ADMIN_EMAIL: admin@aiimage.local
       AIIMAGE_BOOTSTRAP_ADMIN_PASSWORD: LocalOnly-ChangeMe-2026
       AIIMAGE_WORKER_MAX_CONCURRENCY: 4
+      AIIMAGE_WORKER_MAX_ATTEMPTS: 3
+      AIIMAGE_WORKER_RETRY_BASE_SECONDS: 5
+      AIIMAGE_ALLOW_PRIVATE_PROVIDER_URLS: "true"
+      AIIMAGE_LOGIN_MAX_ATTEMPTS: 5
+      AIIMAGE_LOGIN_WINDOW_SECONDS: 300
       AIIMAGE_PROVIDER_CONCURRENCY_LIMITS: '{"generic_http":2,"comfyui":1}'
     ports:
       - "8000:8000"
@@ -70,7 +75,7 @@ services:
       redis: {condition: service_healthy}
       minio: {condition: service_healthy}
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live')"]
       interval: 3s
       timeout: 3s
       retries: 30

@@ -41,3 +41,10 @@ class CapabilityReport(BaseModel):
     total_cost_minor: int
     median_latency_ms: int
     results_path: Path
+    technical_passed_attempts: int = 0
+    technical_pass_rate: float = 0
+    human_reviewed_attempts: int = 0
+    human_passed_attempts: int = 0
+    human_pass_rate: float | None = None
+    category_results: dict[str, dict[str, float | int]] = Field(default_factory=dict)
+    release_ready: bool = False

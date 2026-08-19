@@ -12,10 +12,27 @@ class QueueHints:
     async def publish(self, step_id: UUID) -> bool:
         client = Redis.from_url(get_settings().redis_url)
         try:
+            accepted = await client.set(
+                f"aiimage:generation:wakeup:{step_id}",
+                "1",
+                ex=60,
+                nx=True,
+            )
+            if not accepted:
+                return True
             await client.lpush(self.queue_name, str(step_id))
             return True
         except RedisConnectionError:
             return False
+        finally:
+            await client.aclose()
+
+    async def acknowledge(self, step_id: UUID) -> None:
+        client = Redis.from_url(get_settings().redis_url)
+        try:
+            await client.delete(f"aiimage:generation:wakeup:{step_id}")
+        except RedisConnectionError:
+            return
         finally:
             await client.aclose()
 

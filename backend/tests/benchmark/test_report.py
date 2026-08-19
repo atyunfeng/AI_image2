@@ -27,3 +27,6 @@ def test_report_aggregates_results(tmp_path: Path):
     assert report.total_attempts == 2
     assert report.successful_attempts == 1
     assert report.median_latency_ms == 150
+    assert report.technical_pass_rate == 0
+    assert report.human_pass_rate is None
+    assert report.release_ready is False

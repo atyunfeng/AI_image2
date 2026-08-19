@@ -40,6 +40,24 @@ async def run_structural_quality(
             )
             for result in results
         ]
+        + [
+            QualityCheck(
+                run_id=run.id,
+                code="semantic_human_review_required",
+                passed=False,
+                blocking=False,
+                expected={
+                    "checks": [
+                        "product_identity",
+                        "color_material",
+                        "logo_text",
+                        "visual_artifacts",
+                    ]
+                },
+                measured={"automated_semantic_provider": None},
+                message="结构检查已完成；商品语义质量仍需人工审核",
+            )
+        ]
     )
     return run
 

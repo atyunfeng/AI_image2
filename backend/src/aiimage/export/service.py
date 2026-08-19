@@ -166,3 +166,51 @@ async def list_export_records(session: AsyncSession, batch_id: UUID) -> list[Exp
             )
         ).all()
     )
+
+
+async def build_production_plan_export_zip(
+    session: AsyncSession,
+    store: ObjectStore,
+    *,
+    plan_id: UUID,
+    user_id: UUID,
+) -> bytes:
+    batches = list(
+        (
+            await session.scalars(
+                select(GenerationBatch)
+                .where(GenerationBatch.production_plan_id == plan_id)
+                .order_by(GenerationBatch.created_at, GenerationBatch.id)
+            )
+        ).all()
+    )
+    if not batches:
+        raise LookupError(plan_id)
+    blocked = [
+        batch
+        for batch in batches
+        if batch.status not in {BatchStatus.APPROVED.value, BatchStatus.EXPORTED.value}
+    ]
+    if blocked:
+        raise ExportConflictError("Every image in the production plan must be approved")
+    output = BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as combined:
+        for batch in batches:
+            archive_bytes = await build_export_zip(
+                session,
+                store,
+                batch_id=batch.id,
+                user_id=user_id,
+            )
+            with ZipFile(BytesIO(archive_bytes)) as archive:
+                for name in archive.namelist():
+                    target = f"{batch.requested_view}-{str(batch.id)[:8]}/{name}"
+                    combined.writestr(target, archive.read(name))
+    await record_audit_event(
+        session,
+        event_type="production_plan.exported",
+        actor_user_id=user_id,
+        details={"production_plan_id": str(plan_id), "batch_count": len(batches)},
+    )
+    await session.commit()
+    return output.getvalue()
