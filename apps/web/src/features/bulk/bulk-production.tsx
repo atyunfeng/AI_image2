@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 import { BulkJob, ModelConfiguration, TemplatePack } from "@/lib/types";
 
@@ -13,6 +13,20 @@ export function BulkProduction({ models, packs, initialJobs }: { models: ModelCo
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
 
+  useEffect(() => {
+    const active = jobs.filter((job) => ["pending", "processing"].includes(job.status));
+    if (!active.length) return;
+    const timer = window.setInterval(async () => {
+      const updates = await Promise.all(active.map(async (job) => {
+        const response = await fetch(`/api/backend/bulk-jobs/${job.id}`, { cache: "no-store" });
+        return response.ok ? await response.json() as BulkJob : job;
+      }));
+      const byId = new Map(updates.map((job) => [job.id, job]));
+      setJobs((current) => current.map((job) => byId.get(job.id) ?? job));
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [jobs]);
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy(true);
@@ -21,7 +35,7 @@ export function BulkProduction({ models, packs, initialJobs }: { models: ModelCo
     const body = await response.json().catch(() => ({ detail: "导入失败" }));
     if (response.ok) {
       setJobs((current) => [body, ...current]);
-      setMessage(body.dry_run ? "文件预检完成，未创建生产任务。" : "批量任务已创建，失败行不会影响成功行。");
+      setMessage(body.dry_run ? "预检已进入后台队列，完成后自动刷新结果。" : "批量任务已进入后台队列，失败行不会影响成功行。");
     } else setMessage(body.detail ?? "导入失败");
     setBusy(false);
   }

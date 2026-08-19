@@ -31,6 +31,10 @@ class BulkJob(Base):
     total_rows: Mapped[int] = mapped_column(Integer, default=0)
     succeeded_rows: Mapped[int] = mapped_column(Integer, default=0)
     failed_rows: Mapped[int] = mapped_column(Integer, default=0)
+    lease_owner: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_by_user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
@@ -51,4 +55,3 @@ class BulkJobRow(Base):
         ForeignKey("production_plans.id"), nullable=True
     )
     batch_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
-

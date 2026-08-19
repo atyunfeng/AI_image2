@@ -11,8 +11,7 @@ from aiimage.api.dependencies import get_session
 from aiimage.auth.dependencies import require_roles
 from aiimage.auth.models import Role, User
 from aiimage.bulk.schemas import BulkJobResponse
-from aiimage.bulk.service import BulkImportError, create_bulk_job, get_bulk_job, list_bulk_jobs
-from aiimage.workflow.queue import QueueHints, get_queue_hints
+from aiimage.bulk.service import BulkImportError, enqueue_bulk_job, get_bulk_job, list_bulk_jobs
 
 router = APIRouter(prefix="/bulk-jobs", tags=["bulk-jobs"])
 BulkUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR))]
@@ -65,11 +64,10 @@ async def download_bulk_errors(
     )
 
 
-@router.post("/import", response_model=BulkJobResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/import", response_model=BulkJobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def import_bulk_job(
     user: BulkUser,
     session: Annotated[AsyncSession, Depends(get_session)],
-    queue: Annotated[QueueHints, Depends(get_queue_hints)],
     model_configuration_id: Annotated[UUID, Form()],
     category_pack_version_id: Annotated[UUID, Form()],
     brand_pack_version_id: Annotated[UUID, Form()],
@@ -79,9 +77,8 @@ async def import_bulk_job(
     if file is None:
         raise HTTPException(status_code=422, detail="CSV or XLSX file is required")
     try:
-        return await create_bulk_job(
+        return await enqueue_bulk_job(
             session,
-            queue,
             filename=file.filename or "import.csv",
             content=await file.read(),
             dry_run=dry_run,
