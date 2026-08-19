@@ -20,6 +20,10 @@ from aiimage.workflow.service import BatchValidationError, clone_batch, create_b
 
 router = APIRouter(prefix="/batches", tags=["batches"])
 BatchUser = Annotated[User, Depends(require_roles(Role.ADMIN, Role.OPERATOR))]
+BatchReader = Annotated[
+    User,
+    Depends(require_roles(Role.ADMIN, Role.OPERATOR, Role.REVIEWER)),
+]
 
 
 def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDetailResponse:
@@ -49,7 +53,7 @@ def _to_detail(batch: GenerationBatch, step: GenerationStep | None) -> BatchDeta
 
 @router.get("", response_model=list[BatchDetailResponse])
 async def list_batches(
-    user: BatchUser,
+    user: BatchReader,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[BatchDetailResponse]:
     del user
@@ -75,7 +79,7 @@ async def list_batches(
 @router.get("/{batch_id}", response_model=BatchDetailResponse)
 async def get_batch(
     batch_id: UUID,
-    user: BatchUser,
+    user: BatchReader,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> BatchDetailResponse:
     del user
