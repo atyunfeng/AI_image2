@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -26,6 +26,23 @@ class Settings(BaseSettings):
     provider_concurrency_limits: dict[str, int] = Field(default_factory=dict)
     worker_max_attempts: int = Field(default=3, ge=1, le=10)
     worker_retry_base_seconds: int = Field(default=5, ge=1, le=3600)
+    allow_private_provider_urls: bool = False
+
+    @model_validator(mode="after")
+    def reject_development_secrets_in_production(self) -> "Settings":
+        if self.env != "production":
+            return self
+        insecure_values = {
+            "jwt_secret": "local-development-jwt-secret-change-before-deploy",
+            "bootstrap_admin_password": "LocalOnly-ChangeMe-2026",
+            "s3_secret_key": "local-development-secret",
+        }
+        for field, insecure in insecure_values.items():
+            if getattr(self, field) == insecure:
+                raise ValueError(f"{field} must be changed in production")
+        if self.secret_key_base64 == "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=":
+            raise ValueError("secret_key_base64 must be changed in production")
+        return self
 
 
 @lru_cache

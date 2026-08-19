@@ -79,7 +79,10 @@ async def test_model_connection(
     if configuration is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     try:
-        await ProviderRegistry(secret_key_base64=settings.secret_key_base64).get(
+        await ProviderRegistry(
+            secret_key_base64=settings.secret_key_base64,
+            allow_private_urls=settings.allow_private_provider_urls,
+        ).get(
             configuration
         ).test_connection()
     except Exception as error:

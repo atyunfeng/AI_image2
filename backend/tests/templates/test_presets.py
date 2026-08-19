@@ -25,6 +25,10 @@ def test_first_party_presets_cover_mainstream_platforms() -> None:
         assert rules["source_note"] == "first_party_default_verify_before_publish"
         assert rules["slots"][0]["key"] == "hero_front"
         assert rules["slots"][0]["allow_text"] is False
+    for pack in packs.values():
+        governance = pack["rules"]["governance"]
+        assert governance["verification_status"] == "requires_official_verification"
+        assert governance["official_source_url"] is None
 
 
 def test_support_presets_include_apparel_and_brand() -> None:

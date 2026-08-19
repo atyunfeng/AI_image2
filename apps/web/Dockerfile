@@ -12,9 +12,10 @@ RUN pnpm --dir apps/web build
 FROM node:22-alpine
 WORKDIR /app
 RUN corepack enable
-COPY --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
-COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/apps/web ./apps/web
+COPY --chown=node:node --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
+COPY --chown=node:node --from=build /app/node_modules ./node_modules
+COPY --chown=node:node --from=build /app/apps/web ./apps/web
 ENV API_BASE_URL=http://api:8000/api/v1 NEXT_TELEMETRY_DISABLED=1 NODE_ENV=production
 EXPOSE 3000
+USER node
 CMD ["node", "apps/web/node_modules/next/dist/bin/next", "start", "apps/web"]

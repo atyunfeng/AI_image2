@@ -22,7 +22,10 @@ async def run_worker() -> None:
     context = WorkerContext(
         session_factory=database.session_factory,
         object_store=get_object_store(),
-        provider_registry=ProviderRegistry(secret_key_base64=settings.secret_key_base64),
+        provider_registry=ProviderRegistry(
+            secret_key_base64=settings.secret_key_base64,
+            allow_private_urls=settings.allow_private_provider_urls,
+        ),
         max_concurrency=settings.worker_max_concurrency,
         provider_concurrency_limits=settings.provider_concurrency_limits,
         max_attempts=settings.worker_max_attempts,
