@@ -16,6 +16,7 @@ from aiimage.catalog.router import router as catalog_router
 from aiimage.config import get_settings
 from aiimage.db import get_database
 from aiimage.editing.router import router as editing_router
+from aiimage.export.router import plan_export_router
 from aiimage.export.router import router as export_router
 from aiimage.fashion.router import router as fashion_router
 from aiimage.models.router import router as model_router
@@ -93,6 +94,7 @@ def create_app() -> FastAPI:
     app.include_router(review_router, prefix="/api/v1")
     app.include_router(quality_router, prefix="/api/v1")
     app.include_router(export_router, prefix="/api/v1")
+    app.include_router(plan_export_router, prefix="/api/v1")
     return app
 
 

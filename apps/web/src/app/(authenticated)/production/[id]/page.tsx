@@ -26,6 +26,7 @@ export default async function ProductionDetailPage({ params }: { params: Promise
           <p className="mt-2 font-mono text-xs text-slate-500">规则哈希 {plan.compiler_hash}</p>
         </div>
         <Link className="secondary-button" href="/production/new">新建套图</Link>
+        {batches.length > 0 && batches.every((batch) => ["approved", "exported"].includes(batch.status)) && <a className="primary-button" href={`/api/backend/production-plans/${id}/export.zip`}>导出整套图片</a>}
       </div>
       <div className="grid gap-5 lg:grid-cols-3">
         {plan.items.map((item) => {

@@ -62,7 +62,7 @@ async def create_fashion_evidence(
         inferred_view=inferred,
         automated_passed=all(checks.values()),
         checks=checks,
-        measured=measured,
+        measured={**measured, "semantic_quality": "human_review_required"},
         human_review_checks=batch.input_snapshot.get("human_review_checks", []),
     )
     session.add(evidence)

@@ -33,7 +33,7 @@ async def create_edit_evidence(
         output_asset_id=output_asset.id,
         automated_passed=all(checks.values()),
         checks=checks,
-        measured=measured,
+        measured={**measured, "semantic_quality": "human_review_required"},
         human_review_checks=[
             "product_identity",
             "edit_boundary",
