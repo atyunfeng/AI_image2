@@ -10,6 +10,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible,te
 .brand-mark { display:grid; width:38px; height:38px; place-items:center; border-radius:12px; background:#ff7448; color:#16121a; font-weight:900; box-shadow:0 0 26px rgb(255 116 72/.25); }
 .nav-link { display:flex; align-items:center; gap:12px; border-radius:12px; padding:11px 13px; white-space:nowrap; color:#aeb6ca; }
 .nav-link:hover { background:rgb(255 255 255/.06); color:white; transform:translateX(2px); }
+.nav-link-active { background:rgb(251 146 60/.14); color:white; box-shadow:inset 3px 0 0 #fb923c; }
 .mobile-nav summary { min-height:44px; cursor:pointer; list-style:none; border:1px solid rgb(255 255 255/.13); border-radius:12px; padding:11px 14px; color:#d8deeb; }
 .mobile-nav summary::-webkit-details-marker { display:none; }
 .mobile-nav summary::after { content:"+"; float:right; color:#ff9a78; }

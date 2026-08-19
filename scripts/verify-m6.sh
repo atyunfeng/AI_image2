@@ -8,5 +8,7 @@ pnpm --dir apps/web lint
 pnpm --dir apps/web test
 pnpm --dir apps/web build
 docker compose up -d --build --wait
-docker compose exec -T api alembic current
+docker compose exec -T api alembic current | grep 0020_bulk_job_leases
+curl --fail --retry 15 --retry-delay 2 http://localhost:8000/api/v1/health/ready
+curl --fail http://localhost:9000/minio/health/live
 pnpm --dir apps/web test:e2e

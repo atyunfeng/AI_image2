@@ -1,7 +1,7 @@
 from typing import Annotated
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -31,12 +31,17 @@ ModelReader = Annotated[
 async def list_models(
     user: ModelReader,
     session: Annotated[AsyncSession, Depends(get_session)],
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+    offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[ModelResponse]:
     del user
     models = list(
         (
             await session.scalars(
-                select(ModelConfiguration).order_by(ModelConfiguration.created_at.desc())
+                select(ModelConfiguration)
+                .order_by(ModelConfiguration.created_at.desc())
+                .offset(offset)
+                .limit(limit)
             )
         ).all()
     )

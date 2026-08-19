@@ -33,10 +33,11 @@ def _base_statement(
     sku: str | None,
     status: str | None = None,
 ):
+    today = datetime.now(UTC).date()
     if date_from is None:
-        date_from = date.today() - timedelta(days=29)
+        date_from = today - timedelta(days=29)
     if date_to is None:
-        date_to = date.today()
+        date_to = today
     statement = (
         select(GenerationStep, GenerationBatch, ModelConfiguration, Product)
         .join(GenerationBatch, GenerationBatch.id == GenerationStep.batch_id)

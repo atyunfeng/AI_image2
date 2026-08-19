@@ -10,9 +10,9 @@
 
 平台规则覆盖淘宝/天猫、京东、拼多多、抖音电商、Amazon、TikTok Shop、Shopify、Temu、Shopee、Lazada 和 eBay。它们是中台维护的可追溯默认值，并非平台官方认证，上架前必须复核目标站点的最新规则。
 
-批量生产接受 UTF-8 CSV 或 XLSX，必填列为 `sku,name,category,platform_slug`，可选列为 `brand,mode,reference_asset_id,reference_view`。已有 SKU 可以复用中台参考图；新 SKU 或无图 SKU 必须填写已上传图片的资产 ID。每行独立记录结果，错误 CSV 可单独下载。
+批量生产接受 UTF-8 CSV 或 XLSX，必填列为 `sku,name,category,platform_slug`，可选列为 `brand,mode,reference_asset_id,reference_view`。已有 SKU 可以复用中台参考图；新 SKU 或无图 SKU 必须填写已上传图片的资产 ID。API 落库后立即返回，Worker 通过 PostgreSQL 租约逐行执行；进程中断后可接管过期租约。每行独立记录结果，错误 CSV 可单独下载。
 
-成本运营按模型配置的三位币种分组，只展示 Provider 回传或配置估算值，不替代服务商账单。运营报告提供队列、成功/重试率、P50/P95 延迟、失败分类和积压告警，并支持日期、Provider、平台、SKU、状态筛选。全局和 Provider 并发上限通过 `AIIMAGE_WORKER_MAX_CONCURRENCY` 与 `AIIMAGE_PROVIDER_CONCURRENCY_LIMITS` 设置。
+成本运营按模型配置的三位币种分组，只展示 Provider 回传或配置估算值，不替代服务商账单。运营报告提供队列、成功/重试率、P50/P95 延迟、失败分类和积压告警，并支持日期、Provider、平台、SKU、状态筛选；未传日期时默认限制在最近 30 天。全局和 Provider 并发上限通过 `AIIMAGE_WORKER_MAX_CONCURRENCY` 与 `AIIMAGE_PROVIDER_CONCURRENCY_LIMITS` 设置。
 
 Mock Provider 只验证任务编排、证据和审核闭环，不代表真实试穿、重绘或上架质量。真实模型、30 SKU 基准、主图技术规则 90% 通过率及虚拟试穿 80% 人工通过率必须使用真实素材和用户提供的 API KEY 验证；自动发布商品仍不在当前范围内。
 
@@ -34,6 +34,8 @@ docker compose up -d --build --wait
 - MinIO 根密码：`local-development-secret`
 
 以上密钥只用于本地开发，部署前必须全部替换。
+
+生产环境将拒绝本仓库示例 JWT、管理员、MinIO 和 AES 密钥。部署时设置 `AIIMAGE_ENV=production`，为所有密钥生成独立随机值，并保持 `AIIMAGE_ALLOW_PRIVATE_PROVIDER_URLS=false`；只有受控内网模型服务才允许显式开启私网 Provider URL。模型中心支持测试连接、启停和 API Key 轮换，Key 只写入不回显。
 
 ## 验证
 
@@ -60,11 +62,28 @@ pnpm --dir apps/web build
 
 ```bash
 uv run --project backend aiimage-benchmark validate benchmarks/manifest.json
-uv run --project backend aiimage-benchmark run benchmarks/manifest.json --model-configuration-id UUID
+uv run --project backend aiimage-benchmark run benchmarks/manifest.json \
+  --model-configuration-id UUID \
+  --email admin@example.com \
+  --password '从安全凭据注入'
 uv run --project backend aiimage-benchmark report benchmark-results.jsonl
 ```
 
-仓库不包含虚构商品素材、真实供应商密钥或伪造的能力报告。
+`run` 会登录本地 API、上传真实参考图、提交并轮询任务，再把每次尝试写入 JSONL。Mock Provider 会被拒绝作为发布基准；缺少人工审核时报告保持未完成，只有技术通过率不低于 90% 且人工通过率不低于 80% 才会标记 `release_ready`。仓库不包含虚构商品素材、真实供应商密钥或伪造的能力报告。
+
+## 备份与恢复演练
+
+在 Compose 服务运行时创建 PostgreSQL 自包含备份和 MinIO 数据归档：
+
+```bash
+bash scripts/backup.sh /absolute/path/to/backup
+bash scripts/restore-check.sh \
+  /absolute/path/to/backup/postgres-TIMESTAMP.dump \
+  /absolute/path/to/backup/minio-TIMESTAMP.tar \
+  /absolute/path/to/backup/minio-TIMESTAMP.tar.sha256
+```
+
+恢复检查会创建一次性 PostgreSQL 数据库完成真实 `pg_restore`，并把 MinIO 归档解压到一次性目录校验；演练结束自动清理临时目标，不覆盖现有业务数据。
 
 ## 架构原则
 

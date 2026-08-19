@@ -1,5 +1,6 @@
 import Link from "next/link";
 
+import { NavigationLinks } from "@/components/navigation-links";
 import { ServiceState } from "@/components/service-state";
 import { LogoutButton } from "@/features/auth/logout-button";
 
@@ -24,7 +25,7 @@ function Navigation({ roles, mobile = false }: { roles: string[]; mobile?: boole
   const visible = navigation.filter((item) => item.roles?.some((role) => roles.includes(role)));
   return (
     <nav aria-label={mobile ? "移动端中台主导航" : "中台主导航"} className={mobile ? "mobile-nav-list" : "grid gap-1"}>
-      {visible.map((item) => <Link key={item.href} href={item.href} className="nav-link">{item.label}</Link>)}
+      <NavigationLinks items={visible} />
     </nav>
   );
 }

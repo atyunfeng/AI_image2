@@ -54,14 +54,14 @@ test("operator imports a marketplace CSV and sees cost operations", async ({
     });
   await page.getByRole("button", { name: "上传并创建任务" }).click();
   await expect(
-    page.getByText("批量任务已创建，失败行不会影响成功行。"),
+    page.getByText("批量任务已进入后台队列，失败行不会影响成功行。"),
   ).toBeVisible();
   const importedRow = page.getByRole("row").filter({ hasText: sku });
   await expect(importedRow).toBeVisible();
   await expect(importedRow.getByRole("cell", { name: "jd-cn" })).toBeVisible();
   await expect(
     importedRow.getByRole("link", { name: "查看套图" }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 15_000 });
 
   await page.goto("/analytics");
   await expect(page.getByRole("heading", { name: "成本运营" })).toBeVisible();

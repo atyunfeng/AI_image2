@@ -14,6 +14,11 @@ esac
 mkdir -p "$backup_dir"
 stamp="$(date -u +%Y%m%dT%H%M%SZ)"
 docker compose exec -T postgres pg_dump -U aiimage -Fc aiimage > "$backup_dir/postgres-$stamp.dump"
-docker compose exec -T minio sh -c 'find /data -type f -print0 | sort -z | xargs -0 sha256sum' > "$backup_dir/minio-$stamp.sha256"
+minio_container="$(docker compose ps -q minio)"
+test -n "$minio_container"
+docker run --rm --volumes-from "$minio_container" postgres:17-alpine \
+  tar -C /data -cf - . > "$backup_dir/minio-$stamp.tar"
+shasum -a 256 "$backup_dir/minio-$stamp.tar" > "$backup_dir/minio-$stamp.tar.sha256"
 echo "$backup_dir/postgres-$stamp.dump"
-echo "$backup_dir/minio-$stamp.sha256"
+echo "$backup_dir/minio-$stamp.tar"
+echo "$backup_dir/minio-$stamp.tar.sha256"
