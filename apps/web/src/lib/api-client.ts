@@ -28,3 +28,18 @@ export async function safeApiFetch<T>(path: string, fallback: T): Promise<T> {
     throw error;
   }
 }
+
+export type Readiness = {
+  status: "ready" | "degraded";
+  checks: Record<string, boolean>;
+};
+
+export async function apiReadiness(): Promise<Readiness> {
+  try {
+    const response = await fetch(`${API_BASE_URL}/health/ready`, { cache: "no-store" });
+    const payload = (await response.json()) as Readiness;
+    return payload;
+  } catch {
+    return { status: "degraded", checks: {} };
+  }
+}

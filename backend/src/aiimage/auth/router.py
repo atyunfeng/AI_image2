@@ -9,6 +9,7 @@ from aiimage.auth.dependencies import AdminUser, CurrentUser
 from aiimage.auth.models import User
 from aiimage.auth.schemas import LoginRequest, TokenResponse, UserResponse
 from aiimage.auth.service import authenticate_user, create_access_token
+from aiimage.auth.throttle import clear_login_failures, login_is_limited, record_login_failure
 from aiimage.config import Settings, get_settings
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -20,20 +21,28 @@ async def login(
     session: Annotated[AsyncSession, Depends(get_session)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> TokenResponse:
+    email = str(payload.email).lower()
+    if await login_is_limited(email, settings):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Too many login attempts; try again later",
+        )
     user = await authenticate_user(
         session,
-        email=str(payload.email),
+        email=email,
         password=payload.password,
     )
     if user is None:
+        await record_login_failure(email, settings)
         await record_audit_event(
             session,
             event_type="auth.login_failed",
             actor_user_id=None,
-            details={"email": str(payload.email).lower()},
+            details={"email": email},
         )
         await session.commit()
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+    await clear_login_failures(email, settings)
     await record_audit_event(
         session,
         event_type="auth.login_succeeded",

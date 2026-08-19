@@ -1,5 +1,6 @@
 "use server";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000/api/v1";
 export type LoginInput = { email: string; password: string };
@@ -13,4 +14,7 @@ export async function loginAction(input: LoginInput): Promise<LoginResult> {
   return { ok: true };
 }
 
-export async function logoutAction(): Promise<void> { (await cookies()).delete("aiimage_session"); }
+export async function logoutAction(): Promise<void> {
+  (await cookies()).delete("aiimage_session");
+  redirect("/login");
+}

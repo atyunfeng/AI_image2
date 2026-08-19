@@ -1,11 +1,16 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
-import { safeApiFetch } from "@/lib/api-client";
+import { apiFetch, safeApiFetch } from "@/lib/api-client";
 import { Batch, ModelConfiguration, OperationsReport, Product } from "@/lib/types";
 
 const emptyOperations: OperationsReport = { generated_at: "", queued_count: 0, running_count: 0, review_pending_count: 0, failed_count: 0, total_calls: 0, succeeded_calls: 0, retry_calls: 0, success_rate: 0, retry_rate: 0, latency_p50_ms: 0, latency_p95_ms: 0, failure_classes: [], cost_groups: [], alerts: [] };
 
 export default async function DashboardPage() {
+  const user = await apiFetch<{ roles: string[] }>("/auth/me");
+  if (!user.roles.some((role) => ["admin", "operator"].includes(role))) {
+    redirect(user.roles.includes("reviewer") ? "/review" : "/editing");
+  }
   const [products, models, batches, operations] = await Promise.all([safeApiFetch<Product[]>("/products", []), safeApiFetch<ModelConfiguration[]>("/models", []), safeApiFetch<Batch[]>("/batches", []), safeApiFetch<OperationsReport>("/analytics/operations", emptyOperations)]);
   return <div className="space-y-8"><section className="flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><p className="eyebrow">CONTROL ROOM</p><h1 className="page-title">电商视觉生产线</h1><p className="mt-3 max-w-2xl text-slate-400">从商品真值与参考图出发，统一编排生图模型、人工审核和可追溯导出。</p></div><Link href="/batches/new" className="primary-button">新建生成批次</Link></section>
     {operations.alerts.length > 0 && <section className="space-y-3" aria-label="需要处理的运营告警">{operations.alerts.map((alert) => <Link className="failure-note block" href={alert.action_url} key={alert.code}><strong>{alert.title}</strong><span className="ml-2">{alert.detail}</span></Link>)}</section>}

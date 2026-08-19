@@ -21,11 +21,15 @@ from aiimage.providers.registry import ProviderRegistry
 
 router = APIRouter(prefix="/models", tags=["models"])
 AdminUser = Annotated[User, Depends(require_roles(Role.ADMIN))]
+ModelReader = Annotated[
+    User,
+    Depends(require_roles(Role.ADMIN, Role.OPERATOR, Role.DESIGNER)),
+]
 
 
 @router.get("", response_model=list[ModelResponse])
 async def list_models(
-    user: AdminUser,
+    user: ModelReader,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> list[ModelResponse]:
     del user

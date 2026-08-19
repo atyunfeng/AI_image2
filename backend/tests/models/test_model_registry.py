@@ -47,3 +47,17 @@ async def test_admin_rotates_and_disables_model_without_exposing_secret(admin_cl
     details = audit.json()["items"][0]["details"]
     assert details["key_rotated"] is True
     assert "provider-key" not in str(details)
+
+
+async def test_operator_can_select_models_but_cannot_manage_them(operator_client) -> None:
+    assert (await operator_client.get("/api/v1/models")).status_code == 200
+    create = await operator_client.post(
+        "/api/v1/models",
+        json={
+            "name": "Forbidden",
+            "provider": "mock",
+            "model_id": "mock-v1",
+            "capabilities": ["reference_to_image"],
+        },
+    )
+    assert create.status_code == 403

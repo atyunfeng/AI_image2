@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     worker_max_attempts: int = Field(default=3, ge=1, le=10)
     worker_retry_base_seconds: int = Field(default=5, ge=1, le=3600)
     allow_private_provider_urls: bool = False
+    login_max_attempts: int = Field(default=5, ge=1, le=100)
+    login_window_seconds: int = Field(default=300, ge=30, le=86400)
 
     @model_validator(mode="after")
     def reject_development_secrets_in_production(self) -> "Settings":
