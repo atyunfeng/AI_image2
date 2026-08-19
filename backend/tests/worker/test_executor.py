@@ -18,6 +18,18 @@ from aiimage.workflow.models import GenerationBatch, GenerationStep
 from aiimage.workflow.state import BatchStatus, StepStatus
 
 
+class FailingProvider:
+    async def generate(self, request):
+        del request
+        raise TimeoutError("temporary provider timeout")
+
+
+class FailingRegistry:
+    def get(self, configuration):
+        del configuration
+        return FailingProvider()
+
+
 async def _queued_step(session_factory, png_bytes):
     store = InMemoryObjectStore()
     stored = await store.put(content=png_bytes, mime_type="image/png")
@@ -119,6 +131,29 @@ async def test_duplicate_delivery_is_noop(session_factory, png_bytes) -> None:
 
     assert not await execute_step(step_id, worker_id="test-worker", context=context)
     assert len(store.objects) == object_count
+
+
+@pytest.mark.asyncio
+async def test_provider_error_is_scheduled_with_backoff(session_factory, png_bytes) -> None:
+    step_id, batch_id, store = await _queued_step(session_factory, png_bytes)
+    context = WorkerContext(
+        session_factory=session_factory,
+        object_store=store,
+        provider_registry=FailingRegistry(),
+        max_attempts=3,
+        retry_base_seconds=2,
+    )
+
+    assert not await execute_step(step_id, worker_id="retry-worker", context=context)
+
+    async with session_factory() as session:
+        step = await session.get(GenerationStep, step_id)
+        batch = await session.get(GenerationBatch, batch_id)
+        assert step.status == StepStatus.RETRY_QUEUED.value
+        assert step.next_attempt_at is not None
+        scheduled = step.next_attempt_at.replace(tzinfo=UTC)
+        assert scheduled > datetime.now(UTC)
+        assert batch.status == BatchStatus.RETRY_QUEUED.value
 
 
 @pytest.mark.asyncio

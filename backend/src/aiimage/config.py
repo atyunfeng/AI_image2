@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     bootstrap_admin_password: str
     worker_max_concurrency: int = Field(default=4, ge=1, le=128)
     provider_concurrency_limits: dict[str, int] = Field(default_factory=dict)
+    worker_max_attempts: int = Field(default=3, ge=1, le=10)
+    worker_retry_base_seconds: int = Field(default=5, ge=1, le=3600)
 
 
 @lru_cache

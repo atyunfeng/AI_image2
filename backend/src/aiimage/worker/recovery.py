@@ -22,8 +22,14 @@ async def recover_generation_steps(
                 await session.scalars(
                     select(GenerationStep).where(
                         or_(
-                            GenerationStep.status.in_(
-                                [StepStatus.QUEUED.value, StepStatus.RETRY_QUEUED.value]
+                            (
+                                GenerationStep.status.in_(
+                                    [StepStatus.QUEUED.value, StepStatus.RETRY_QUEUED.value]
+                                )
+                                & or_(
+                                    GenerationStep.next_attempt_at.is_(None),
+                                    GenerationStep.next_attempt_at <= recovery_time,
+                                )
                             ),
                             (
                                 (GenerationStep.status == StepStatus.RUNNING.value)
@@ -39,6 +45,7 @@ async def recover_generation_steps(
                 step.status = StepStatus.RETRY_QUEUED.value
                 step.lease_owner = None
                 step.lease_expires_at = None
+                step.next_attempt_at = recovery_time
         await session.commit()
     for step in steps:
         await queue.publish(step.id)

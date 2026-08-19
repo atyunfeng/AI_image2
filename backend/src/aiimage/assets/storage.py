@@ -27,6 +27,9 @@ class ObjectStore(Protocol):
     async def get(self, *, object_key: str) -> bytes:
         raise NotImplementedError
 
+    async def health(self) -> None:
+        raise NotImplementedError
+
 
 def describe_object(*, content: bytes, mime_type: str) -> StoredObject:
     if mime_type not in ALLOWED_ASSET_TYPES:
@@ -53,6 +56,9 @@ class InMemoryObjectStore:
 
     async def get(self, *, object_key: str) -> bytes:
         return self.objects[object_key]
+
+    async def health(self) -> None:
+        return None
 
 
 class S3ObjectStore:
@@ -86,6 +92,9 @@ class S3ObjectStore:
             Key=object_key,
         )
         return await asyncio.to_thread(response["Body"].read)
+
+    async def health(self) -> None:
+        await asyncio.to_thread(self.client.head_bucket, Bucket=self.bucket)
 
     def _ensure_bucket(self) -> None:
         try:

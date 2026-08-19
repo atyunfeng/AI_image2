@@ -50,6 +50,8 @@ class WorkerContext:
     provider_registry: ProviderRegistry
     max_concurrency: int = 4
     provider_concurrency_limits: dict[str, int] = field(default_factory=dict)
+    max_attempts: int = 3
+    retry_base_seconds: int = 5
 
 
 class StructuralQAError(RuntimeError):
@@ -100,6 +102,8 @@ async def _lease_step(
             StepStatus.RUNNING.value,
         }:
             return None
+        if step.next_attempt_at is not None and step.next_attempt_at > now:
+            return None
         batch = await session.get(GenerationBatch, step.batch_id)
         if batch is None:
             return None
@@ -141,6 +145,7 @@ async def _lease_step(
         step.started_at = now
         step.lease_owner = worker_id
         step.lease_expires_at = now + LEASE_DURATION
+        step.next_attempt_at = None
         step.attempt_count += 1
         batch.status = BatchStatus.RUNNING.value
         await session.commit()
@@ -225,19 +230,36 @@ async def _fashion_authorization_is_current(
         return profile is not None and authorization_is_current(profile)
 
 
-async def _mark_failed(step_id: UUID, classification: str, context: WorkerContext) -> None:
+async def _mark_failed(
+    step_id: UUID,
+    classification: str,
+    context: WorkerContext,
+    *,
+    retryable: bool = False,
+) -> None:
     async with context.session_factory() as session:
         step = await session.get(GenerationStep, step_id)
         if step is None or step.status in TERMINAL_STEP_STATUSES:
             return
         batch = await session.get(GenerationBatch, step.batch_id)
-        step.status = StepStatus.FAILED.value
-        step.completed_at = datetime.now(UTC)
+        now = datetime.now(UTC)
+        should_retry = retryable and step.attempt_count < context.max_attempts
+        step.status = (
+            StepStatus.RETRY_QUEUED.value if should_retry else StepStatus.FAILED.value
+        )
+        step.completed_at = None if should_retry else now
         step.error_classification = classification
         step.lease_owner = None
         step.lease_expires_at = None
+        step.next_attempt_at = (
+            now + timedelta(seconds=context.retry_base_seconds * 2 ** max(0, step.attempt_count - 1))
+            if should_retry
+            else None
+        )
         if batch is not None:
-            batch.status = BatchStatus.FAILED.value
+            batch.status = (
+                BatchStatus.RETRY_QUEUED.value if should_retry else BatchStatus.FAILED.value
+            )
             if batch.edit_revision_id is not None:
                 revision = await session.get(EditRevision, batch.edit_revision_id)
                 if revision is not None:
@@ -296,7 +318,7 @@ async def execute_step(step_id: UUID, worker_id: str, context: WorkerContext) ->
         return False
     except Exception:
         logger.exception("Provider execution failed for generation step %s", step_id)
-        await _mark_failed(step_id, "provider_error", context)
+        await _mark_failed(step_id, "provider_error", context, retryable=True)
         return False
 
     async with context.session_factory() as session:
