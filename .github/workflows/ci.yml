@@ -25,6 +25,8 @@ jobs:
         run: uv python install 3.13
       - name: Install backend dependencies
         run: uv sync --project backend --frozen
+      - name: Configure backend test defaults
+        run: cp .env.example .env
       - name: Lint backend
         run: uv run --project backend ruff check backend/src backend/tests
       - name: Test backend
