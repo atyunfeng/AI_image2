@@ -1,0 +1,41 @@
+name: Bug Report
+description: 报告可复现的产品或工程缺陷
+title: "[Bug]: "
+labels: ["bug", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: 请先移除 API Key、密码、订单数据、人物隐私和未授权素材。安全漏洞请使用 Security 页面的私密报告入口。
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 实际发生了什么，预期行为是什么？
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 提供可以稳定复现问题的最小步骤。
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: 版本
+      description: Git 标签、提交 SHA 或镜像标签。
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 环境
+      description: 操作系统、浏览器、Docker、Python、Node.js 和 Provider 信息。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 脱敏日志或截图
+      description: 不要包含凭据、真实订单或未授权人物素材。

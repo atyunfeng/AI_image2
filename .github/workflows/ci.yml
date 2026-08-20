@@ -1,29 +1,51 @@
-name: ci
+name: CI
 
 on:
   push:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  verify:
+  backend:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
-          version: "0.8.14"
+          version: 0.8.14
+          enable-cache: true
+      - name: Install Python
+        run: uv python install 3.13
+      - name: Install backend dependencies
+        run: uv sync --project backend --frozen
+      - name: Lint backend
+        run: uv run --project backend ruff check backend/src backend/tests
+      - name: Test backend
+        run: uv run --project backend pytest backend/tests
+
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
         with:
-          version: "11.19.0"
+          version: 11.19.0
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: 22
           cache: pnpm
-      - run: uv sync --project backend --frozen
-      - run: pnpm install --frozen-lockfile
-      - run: uv run --project backend ruff check backend
-      - run: uv run --project backend pytest backend/tests -q
-      - run: pnpm --dir apps/web test
-      - run: pnpm --dir apps/web lint
-      - run: pnpm --dir apps/web build
+      - name: Install web dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Lint web
+        run: pnpm --dir apps/web lint
+      - name: Test web
+        run: pnpm --dir apps/web test
+      - name: Build web
+        run: pnpm --dir apps/web build

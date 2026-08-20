@@ -1,0 +1,40 @@
+name: Feature Request
+description: 提议范围明确、可验收的功能
+title: "[Feature]: "
+labels: ["enhancement", "needs-triage"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 使用场景
+      description: 当前用户遇到什么问题？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 描述最小可行行为，不要只写技术实现。
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: 验收条件
+      description: 如何判断功能已正确完成？
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: 功能范围
+      options:
+        - 商品与素材
+        - 生成任务与模型 Provider
+        - 模特、多角度或虚拟试穿
+        - 单图微调
+        - 批量生产与导出
+        - 平台规则与运营
+        - 部署、性能或安全
+    validations:
+      required: true

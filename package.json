@@ -1,6 +1,15 @@
 {
   "name": "aiimage-platform",
   "private": true,
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/atyunfeng/AI_image2.git"
+  },
+  "bugs": {
+    "url": "https://github.com/atyunfeng/AI_image2/issues"
+  },
+  "homepage": "https://github.com/atyunfeng/AI_image2#readme",
   "packageManager": "pnpm@11.19.0",
   "scripts": {
     "dev:web": "pnpm --dir apps/web dev",

@@ -161,7 +161,7 @@ Expected: all commands exit 0.
 Run:
 
 ```bash
-node /Users/chu/.codex/skills/impeccable/scripts/detect.mjs --json apps/web/src/app/globals.css apps/web/src/app/'(authenticated)'/models/page.tsx apps/web/src/features/models/model-list.tsx apps/web/src/features/models/model-form.tsx apps/web/src/features/bulk/bulk-production.tsx apps/web/src/app/'(authenticated)'/analytics/page.tsx
+node /path/to/impeccable/scripts/detect.mjs --json apps/web/src/app/globals.css apps/web/src/app/'(authenticated)'/models/page.tsx apps/web/src/features/models/model-list.tsx apps/web/src/features/models/model-form.tsx apps/web/src/features/bulk/bulk-production.tsx apps/web/src/app/'(authenticated)'/analytics/page.tsx
 ```
 
 Expected: no newly introduced high-confidence UI violations.

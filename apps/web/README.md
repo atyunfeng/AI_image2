@@ -1,36 +1,30 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AI_image2 Web Console
 
-## Getting Started
+AI_image2 的 Next.js 运营中台，提供商品、素材、套图生产、虚拟试穿、单图微调、批量任务、
+审核、模板、模型配置和运营分析界面。
 
-First, run the development server:
+## 开发
+
+请先按照仓库根目录 [README](../../README.md) 启动后端依赖，再执行：
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install --frozen-lockfile
+pnpm --dir apps/web dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+默认访问地址为 <http://localhost:3000>。浏览器只访问 Next.js 的同源 API 代理，不应直接
+保存或回显模型 Provider API Key。
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 验证
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+pnpm --dir apps/web test
+pnpm --dir apps/web lint
+pnpm --dir apps/web build
+```
 
-## Learn More
+端到端测试需要运行中的 Compose 环境，详见根目录验证脚本和贡献指南。
 
-To learn more about Next.js, take a look at the following resources:
+## License
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+本目录原创代码按 `GPL-3.0-only` 发布，完整条款见仓库根目录 [LICENSE](../../LICENSE)。

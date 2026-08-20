@@ -1,6 +1,25 @@
-# AI 电商自动化生图中台
+# AI_image2 — AI 电商自动化生图中台
 
 面向国内外电商商品视觉生产的中台。M0–M6 已实现商品真值与参考图、可配置模型 API KEY、持久化生成批次、后台 worker、人工审核和可追溯 ZIP 导出；覆盖 11 个国内外平台默认规则包、服装鞋帽的授权模特、多角度和虚拟试穿、不可变单图微调、CSV/XLSX 批量生产、模板版本、用户治理、审计和运营告警。
+
+## 开源与许可
+
+AI_image2 的原创源代码、构建脚本和部署配置按
+[GNU General Public License v3.0 only](LICENSE) 发布。使用 SPDX 标识：
+`GPL-3.0-only`。
+
+Copyright (C) 2026 Chu and contributors.
+
+GPL 不会自动覆盖用户上传内容、模型权重、Provider 输出、第三方素材或项目商标。公开部署、
+二次分发或商业使用前，请阅读：
+
+- [开源范围与内容权利](docs/OPEN_SOURCE_SCOPE.md)
+- [负责任使用指南](docs/RESPONSIBLE_USE.md)
+- [第三方来源与许可证](THIRD_PARTY.md)
+- [贡献指南](CONTRIBUTING.md)
+- [安全策略](SECURITY.md)
+- [商标政策](TRADEMARKS.md)
+- [维护者发布流程](docs/RELEASING.md)
 
 ## 当前边界
 

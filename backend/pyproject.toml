@@ -1,6 +1,7 @@
 [project]
 name = "aiimage"
 version = "0.1.0"
+license = "GPL-3.0-only"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "alembic>=1.16,<2",
@@ -38,6 +39,11 @@ aiimage-api = "aiimage.api.main:run"
 aiimage-worker = "aiimage.worker.main:main"
 aiimage-benchmark = "aiimage.benchmark.cli:main"
 aiimage-bootstrap = "aiimage.auth.bootstrap:main"
+
+[project.urls]
+Homepage = "https://github.com/atyunfeng/AI_image2"
+Repository = "https://github.com/atyunfeng/AI_image2.git"
+Issues = "https://github.com/atyunfeng/AI_image2/issues"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
