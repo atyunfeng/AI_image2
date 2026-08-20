@@ -36,6 +36,21 @@ AGPL 不会自动覆盖用户上传内容、模型权重、Provider 输出、第
 
 Mock Provider 只验证任务编排、证据和审核闭环，不代表真实试穿、重绘或上架质量。真实模型、30 SKU 基准、主图技术规则 90% 通过率及虚拟试穿 80% 人工通过率必须使用真实素材和用户提供的 API KEY 验证；自动发布商品仍不在当前范围内。
 
+## 界面预览
+
+以下截图来自响应式页面验收，使用测试数据和 Mock Provider，仅展示当前中台界面与流程，
+不代表真实模型的生图、虚拟试穿或上架质量。
+
+### 桌面端
+
+![AI_image2 桌面端总览](apps/web/artifacts/product-hardening-1440.png)
+
+### 移动端
+
+<p align="center">
+  <img src="apps/web/artifacts/product-hardening-375.png" alt="AI_image2 移动端总览" width="375">
+</p>
+
 ## 本地启动
 
 要求 Docker Desktop、Python 3.13、uv、Node.js 22 和 pnpm 11。
