@@ -27,4 +27,4 @@ pnpm --dir apps/web build
 
 ## License
 
-本目录原创代码按 `GPL-3.0-only` 发布，完整条款见仓库根目录 [LICENSE](../../LICENSE)。
+本目录原创代码按 `AGPL-3.0-only` 发布，完整条款见仓库根目录 [LICENSE](../../LICENSE)。

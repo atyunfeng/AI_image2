@@ -1,7 +1,7 @@
 [project]
 name = "aiimage"
 version = "0.1.0"
-license = "GPL-3.0-only"
+license = "AGPL-3.0-only"
 requires-python = ">=3.13,<3.14"
 dependencies = [
   "alembic>=1.16,<2",

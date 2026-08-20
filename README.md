@@ -5,13 +5,14 @@
 ## 开源与许可
 
 AI_image2 的原创源代码、构建脚本和部署配置按
-[GNU General Public License v3.0 only](LICENSE) 发布。使用 SPDX 标识：
-`GPL-3.0-only`。
+[GNU Affero General Public License v3.0 only](LICENSE) 发布。使用 SPDX 标识：
+`AGPL-3.0-only`。
 
 Copyright (C) 2026 Chu and contributors.
 
-GPL 不会自动覆盖用户上传内容、模型权重、Provider 输出、第三方素材或项目商标。公开部署、
-二次分发或商业使用前，请阅读：
+AGPL 不会自动覆盖用户上传内容、模型权重、Provider 输出、第三方素材或项目商标。修改版
+通过网络向用户提供交互服务时，必须显著提供该运行版本对应源码的访问方式；二次分发或
+商业使用前，请阅读：
 
 - [开源范围与内容权利](docs/OPEN_SOURCE_SCOPE.md)
 - [负责任使用指南](docs/RESPONSIBLE_USE.md)
