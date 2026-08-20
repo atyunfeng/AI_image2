@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -9,7 +9,7 @@ ARG API_BASE_URL=http://api:8000/api/v1
 ENV API_BASE_URL=$API_BASE_URL NEXT_TELEMETRY_DISABLED=1
 RUN pnpm --dir apps/web build
 
-FROM node:22-alpine
+FROM node:26-alpine
 WORKDIR /app
 RUN corepack enable
 COPY --chown=node:node --from=build /app/package.json /app/pnpm-lock.yaml /app/pnpm-workspace.yaml ./
