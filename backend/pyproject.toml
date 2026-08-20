@@ -8,7 +8,7 @@ dependencies = [
   "argon2-cffi>=25,<26",
   "asyncpg>=0.30,<1",
   "boto3>=1.40,<2",
-  "cryptography>=45,<46",
+  "cryptography>=50.0.0,<51",
   "fastapi==0.128.8",
   "httpx>=0.28,<1",
   "openpyxl>=3.1,<4",
